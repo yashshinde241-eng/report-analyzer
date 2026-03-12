@@ -15,6 +15,7 @@ Then open report-analyzer.html in your browser!
 import torch
 import torch.nn as nn
 from torchvision import transforms, models
+import joblib
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -56,6 +57,17 @@ inference_transform = transforms.Compose([
 
 print(f"✅ Model loaded successfully!")
 
+# ============================================
+# LOAD TEXT MODEL AT STARTUP
+# ============================================
+TEXT_MODEL_PATH = r"C:\Users\LOQ\OneDrive\Desktop\report-analyzer\models\text_model.pkl"
+VECTORIZER_PATH = r"C:\Users\LOQ\OneDrive\Desktop\report-analyzer\models\vectorizer.pkl"
+
+print(f"🔧 Loading text model...")
+text_model = joblib.load(TEXT_MODEL_PATH)
+vectorizer = joblib.load(VECTORIZER_PATH)
+print(f"✅ Text model loaded successfully!")
+
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -67,35 +79,23 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def simple_file_analysis(text):
     """
-    Simple rule-based detection for demonstration.
-    Replace this with your ML model later!
+    Real ML model inference using trained Logistic Regression
     """
-    text_lower = text.lower()
+    # Convert text to TF-IDF features
+    text_tfidf = vectorizer.transform([text])
 
-    # Example: Looking for keywords related to "Disease A" (e.g., Diabetes)
-    disease_a_keywords = [
-        'glucose', 'blood sugar', 'diabetes', 'insulin',
-        'hemoglobin a1c', 'hba1c', 'hyperglycemia'
-    ]
-
-    # Count how many keywords appear
-    keyword_count = sum(1 for keyword in disease_a_keywords if keyword in text_lower)
-
-    # Simple logic: if 2+ keywords found, consider it detected
-    detected = keyword_count >= 2
-    confidence = min(85 + (keyword_count * 5), 98)
+    # Get prediction
+    prediction = text_model.predict(text_tfidf)[0]
+    probability = text_model.predict_proba(text_tfidf)[0]
+    confidence_score = round(max(probability) * 100, 2)
+    detected = bool(prediction == 1)
 
     return {
         'detected': detected,
-        'confidence': confidence,
-        'diseaseName': 'Diabetes (Disease A)',
-        'reportType': 'file',
-        'debug': {
-            'keywords_found': keyword_count,
-            'text_length': len(text)
-        }
+        'confidence': confidence_score,
+        'diseaseName': 'Diabetes',
+        'reportType': 'file'
     }
-
 
 def simple_image_analysis(image):
     """
