@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedScan - Medical Report Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0A4D68;
+            --primary-light: #088395;
+            --accent: #05BFDB;
+            --success: #00A86B;
+            --warning: #FF6B35;
+            --bg-dark: #0D1B2A;
+            --bg-light: #F8FAFB;
+            --text-dark: #1B263B;
+            --text-light: #E0E1DD;
+            --shadow: rgba(10, 77, 104, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Darker Grotesque', sans-serif;
+            background: linear-gradient(135deg, #0D1B2A 0%, #1B263B 100%);
+            color: var(--text-light);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background grid */
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(5, 191, 219, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(5, 191, 219, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 0;
+            animation: gridMove 20s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(60px, 60px); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary-light), var(--accent));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 24px;
+            color: white;
+            box-shadow: 0 8px 24px var(--shadow);
+        }
+
+        h1 {
+            font-size: 4rem;
+            font-weight: 700;
+            letter-spacing: -2px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #05BFDB, #088395);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 1.4rem;
+            color: rgba(224, 225, 221, 0.7);
+            font-weight: 300;
+            letter-spacing: 0.5px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .upload-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(5, 191, 219, 0.2);
+            border-radius: 24px;
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s ease;
+            animation: fadeInUp 0.8s ease-out;
+            animation-fill-mode: both;
+        }
+
+        .upload-card:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .upload-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 20px 60px rgba(5, 191, 219, 0.2);
+            transform: translateY(-5px);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+
+        .card-title {
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .card-description {
+            color: rgba(224, 225, 221, 0.6);
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .upload-zone {
+            border: 2px dashed rgba(5, 191, 219, 0.3);
+            border-radius: 16px;
+            padding: 50px 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(5, 191, 219, 0.03);
+            position: relative;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--accent);
+            background: rgba(5, 191, 219, 0.08);
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(5, 191, 219, 0.12);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.8;
+        }
+
+        .upload-text {
+            font-size: 1.3rem;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .upload-hint {
+            color: rgba(224, 225, 221, 0.5);
+            font-size: 0.95rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn-analyze {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, var(--primary-light), var(--accent));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            font-family: 'Darker Grotesque', sans-serif;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .btn-analyze:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(5, 191, 219, 0.4);
+        }
+
+        .btn-analyze:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .file-preview {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(5, 191, 219, 0.1);
+            border-radius: 12px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-preview.show {
+            display: flex;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .file-size {
+            font-size: 0.9rem;
+            color: rgba(224, 225, 221, 0.6);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .remove-file {
+            background: rgba(255, 107, 53, 0.2);
+            border: none;
+            color: var(--warning);
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .remove-file:hover {
+            background: rgba(255, 107, 53, 0.3);
+        }
+
+        .processing {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 60px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(5, 191, 219, 0.2);
+            border-radius: 24px;
+            margin-top: 40px;
+        }
+
+        .processing.show {
+            display: flex;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(5, 191, 219, 0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .processing-text {
+            font-size: 1.3rem;
+            font-weight: 500;
+        }
+
+        .result-card {
+            display: none;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(5, 191, 219, 0.2);
+            border-radius: 24px;
+            padding: 50px;
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        .result-card.show {
+            display: block;
+            animation: zoomIn 0.5s ease-out;
+        }
+
+        @keyframes zoomIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .result-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .result-positive .result-icon {
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(255, 107, 53, 0.4));
+            border: 3px solid var(--warning);
+        }
+
+        .result-negative .result-icon {
+            background: linear-gradient(135deg, rgba(0, 168, 107, 0.2), rgba(0, 168, 107, 0.4));
+            border: 3px solid var(--success);
+        }
+
+        .result-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -1px;
+        }
+
+        .result-message {
+            font-size: 1.3rem;
+            color: rgba(224, 225, 221, 0.7);
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .result-confidence {
+            display: inline-block;
+            padding: 12px 24px;
+            background: rgba(5, 191, 219, 0.1);
+            border-radius: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 30px;
+        }
+
+        .disclaimer {
+            background: rgba(255, 107, 53, 0.1);
+            border-left: 4px solid var(--warning);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+            text-align: left;
+        }
+
+        .disclaimer-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--warning);
+        }
+
+        .disclaimer-text {
+            font-size: 0.95rem;
+            color: rgba(224, 225, 221, 0.7);
+            line-height: 1.6;
+        }
+
+        .btn-new-analysis {
+            padding: 14px 32px;
+            background: var(--primary);
+            border: 2px solid var(--accent);
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            font-family: 'Darker Grotesque', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-new-analysis:hover {
+            background: var(--primary-light);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(5, 191, 219, 0.3);
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: rgba(224, 225, 221, 0.4);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 1100px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 3rem;
+            }
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .subtitle {
+                font-size: 1.1rem;
+            }
+            
+            .upload-card {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">M+</div>
+            </div>
+            <h1>MedScan AI</h1>
+            <p class="subtitle">Advanced Medical Report Analysis</p>
+        </header>
+
+        <div class="main-content" id="uploadSection">
+            <!-- File Report Analyzer -->
+            <div class="upload-card">
+                <div class="card-header">
+                    <div class="card-icon">📄</div>
+                    <h2 class="card-title">Document Report</h2>
+                </div>
+                <p class="card-description">
+                    Upload PDF, Word, or text documents containing your medical reports for analysis.
+                </p>
+                <div class="upload-zone" id="fileUploadZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📤</div>
+                    <div class="upload-text">Click or drag to upload</div>
+                    <div class="upload-hint">Supported: PDF, DOC, DOCX, TXT (max 10MB)</div>
+                </div>
+                <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt" />
+                
+                <div class="file-preview" id="filePreview">
+                    <div class="file-info">
+                        <div class="file-name" id="fileName"></div>
+                        <div class="file-size" id="fileSize"></div>
+                    </div>
+                    <button class="remove-file" onclick="removeFile('file')">Remove</button>
+                </div>
+                
+                <button class="btn-analyze" id="fileAnalyzeBtn" disabled onclick="analyzeReport('file')">
+                    Analyze Document
+                </button>
+            </div>
+
+            <!-- Image Report Analyzer -->
+            <div class="upload-card">
+                <div class="card-header">
+                    <div class="card-icon">🖼️</div>
+                    <h2 class="card-title">Image Report</h2>
+                </div>
+                <p class="card-description">
+                    Upload images of your medical reports, test results, or diagnostic scans.
+                </p>
+                <div class="upload-zone" id="imageUploadZone" onclick="document.getElementById('imageInput').click()">
+                    <div class="upload-icon">📸</div>
+                    <div class="upload-text">Click or drag to upload</div>
+                    <div class="upload-hint">Supported: JPG, PNG, JPEG (max 10MB)</div>
+                </div>
+                <input type="file" id="imageInput" accept="image/jpeg,image/png,image/jpg" />
+                
+                <div class="file-preview" id="imagePreview">
+                    <div class="file-info">
+                        <div class="file-name" id="imageName"></div>
+                        <div class="file-size" id="imageSize"></div>
+                    </div>
+                    <button class="remove-file" onclick="removeFile('image')">Remove</button>
+                </div>
+                
+                <button class="btn-analyze" id="imageAnalyzeBtn" disabled onclick="analyzeReport('image')">
+                    Analyze Image
+                </button>
+            </div>
+        </div>
+
+        <!-- Processing State -->
+        <div class="processing" id="processing">
+            <div class="spinner"></div>
+            <div class="processing-text">Analyzing your report...</div>
+            <div class="upload-hint">This may take a few moments</div>
+        </div>
+
+        <!-- Results -->
+        <div class="result-card" id="resultCard">
+            <div class="result-icon" id="resultIcon"></div>
+            <h2 class="result-title" id="resultTitle"></h2>
+            <p class="result-message" id="resultMessage"></p>
+            <div class="result-confidence" id="resultConfidence"></div>
+            
+            <div class="disclaimer">
+                <div class="disclaimer-title">⚠️ Medical Disclaimer</div>
+                <div class="disclaimer-text">
+                    This analysis is for informational purposes only and should not be considered as medical advice. 
+                    Please consult with qualified healthcare professionals for proper diagnosis and treatment. 
+                    Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.
+                </div>
+            </div>
+            
+            <button class="btn-new-analysis" onclick="resetAnalysis()">New Analysis</button>
+        </div>
+
+        <footer>
+            <p>MedScan AI • Powered by Advanced Machine Learning • For Educational Purposes</p>
+        </footer>
+    </div>
+
+    <script>
+        // ============================================
+        // BACKEND CONFIGURATION
+        // ============================================
+        const API_CONFIG = {
+            // Change this to your backend URL
+            BASE_URL: 'http://localhost:5000',  // Flask default
+            // BASE_URL: 'http://localhost:8000',  // FastAPI default
+            // BASE_URL: 'https://your-api.com',  // Production URL
+            
+            ENDPOINTS: {
+                FILE_ANALYSIS: '/api/analyze/file',
+                IMAGE_ANALYSIS: '/api/analyze/image'
+            },
+            
+            // Optional: Add authentication token if needed
+            AUTH_TOKEN: null,  // Set to 'Bearer your-token' if using auth
+        };
+
+        let currentFile = null;
+        let currentImage = null;
+        let currentType = null;
+
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const fileUploadZone = document.getElementById('fileUploadZone');
+        const filePreview = document.getElementById('filePreview');
+        const fileAnalyzeBtn = document.getElementById('fileAnalyzeBtn');
+
+        fileInput.addEventListener('change', (e) => {
+            handleFileSelect(e.target.files[0], 'file');
+        });
+
+        // Image upload handling
+        const imageInput = document.getElementById('imageInput');
+        const imageUploadZone = document.getElementById('imageUploadZone');
+        const imagePreview = document.getElementById('imagePreview');
+        const imageAnalyzeBtn = document.getElementById('imageAnalyzeBtn');
+
+        imageInput.addEventListener('change', (e) => {
+            handleFileSelect(e.target.files[0], 'image');
+        });
+
+        // Drag and drop for file
+        fileUploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUploadZone.classList.add('dragover');
+        });
+
+        fileUploadZone.addEventListener('dragleave', () => {
+            fileUploadZone.classList.remove('dragover');
+        });
+
+        fileUploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUploadZone.classList.remove('dragover');
+            handleFileSelect(e.dataTransfer.files[0], 'file');
+        });
+
+        // Drag and drop for image
+        imageUploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imageUploadZone.classList.add('dragover');
+        });
+
+        imageUploadZone.addEventListener('dragleave', () => {
+            imageUploadZone.classList.remove('dragover');
+        });
+
+        imageUploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imageUploadZone.classList.remove('dragover');
+            handleFileSelect(e.dataTransfer.files[0], 'image');
+        });
+
+        function handleFileSelect(file, type) {
+            if (!file) return;
+
+            // Validate file size (10MB max)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size exceeds 10MB limit');
+                return;
+            }
+
+            if (type === 'file') {
+                currentFile = file;
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('fileSize').textContent = formatFileSize(file.size);
+                filePreview.classList.add('show');
+                fileAnalyzeBtn.disabled = false;
+            } else {
+                currentImage = file;
+                document.getElementById('imageName').textContent = file.name;
+                document.getElementById('imageSize').textContent = formatFileSize(file.size);
+                imagePreview.classList.add('show');
+                imageAnalyzeBtn.disabled = false;
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function removeFile(type) {
+            if (type === 'file') {
+                currentFile = null;
+                fileInput.value = '';
+                filePreview.classList.remove('show');
+                fileAnalyzeBtn.disabled = true;
+            } else {
+                currentImage = null;
+                imageInput.value = '';
+                imagePreview.classList.remove('show');
+                imageAnalyzeBtn.disabled = true;
+            }
+        }
+
+        async function analyzeReport(type) {
+            currentType = type;
+            const file = type === 'file' ? currentFile : currentImage;
+            
+            // Hide upload section and show processing
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('processing').classList.add('show');
+
+            try {
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('report', file);
+                formData.append('type', type);
+
+                // Determine endpoint based on type
+                const endpoint = type === 'file' 
+                    ? API_CONFIG.ENDPOINTS.FILE_ANALYSIS 
+                    : API_CONFIG.ENDPOINTS.IMAGE_ANALYSIS;
+                
+                const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+
+                // Prepare headers
+                const headers = {};
+                if (API_CONFIG.AUTH_TOKEN) {
+                    headers['Authorization'] = API_CONFIG.AUTH_TOKEN;
+                }
+
+                console.log(`Sending request to: ${url}`);
+
+                // Make API call
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                });
+
+                // Check if response is ok
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server error (${response.status}): ${errorText}`);
+                }
+
+                // Parse response
+                const result = await response.json();
+                
+                console.log('Analysis result:', result);
+
+                // Validate response structure
+                if (typeof result.detected === 'undefined') {
+                    throw new Error('Invalid response format: missing "detected" field');
+                }
+
+                displayResult(result);
+
+            } catch (error) {
+                console.error('Analysis error:', error);
+                
+                // Hide processing
+                document.getElementById('processing').classList.remove('show');
+                
+                // Show user-friendly error message
+                let errorMessage = 'An error occurred during analysis. ';
+                
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage += 'Could not connect to the server. Please check if the backend is running.';
+                } else if (error.message.includes('NetworkError')) {
+                    errorMessage += 'Network error. Please check your connection.';
+                } else if (error.message.includes('500')) {
+                    errorMessage += 'Server error. Please try again or contact support.';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                alert(errorMessage);
+                
+                // Reset to upload section
+                document.getElementById('uploadSection').style.display = 'grid';
+            }
+        }
+
+        function displayResult(result) {
+            // Hide processing
+            document.getElementById('processing').classList.remove('show');
+            
+            // Setup result card
+            const resultCard = document.getElementById('resultCard');
+            const resultIcon = document.getElementById('resultIcon');
+            const resultTitle = document.getElementById('resultTitle');
+            const resultMessage = document.getElementById('resultMessage');
+            const resultConfidence = document.getElementById('resultConfidence');
+
+            if (result.detected) {
+                resultCard.className = 'result-card show result-positive';
+                resultIcon.textContent = '⚠️';
+                resultTitle.textContent = 'Positive Detection';
+                resultMessage.textContent = `The analysis indicates potential presence of ${result.diseaseName}. Please consult with a healthcare professional for proper diagnosis and treatment.`;
+            } else {
+                resultCard.className = 'result-card show result-negative';
+                resultIcon.textContent = '✅';
+                resultTitle.textContent = 'Negative Detection';
+                resultMessage.textContent = `The analysis did not detect ${result.diseaseName}. However, this should not replace professional medical evaluation.`;
+            }
+
+            resultConfidence.textContent = `Confidence: ${result.confidence}%`;
+        }
+
+        function resetAnalysis() {
+            // Reset all states
+            currentFile = null;
+            currentImage = null;
+            currentType = null;
+            
+            fileInput.value = '';
+            imageInput.value = '';
+            
+            filePreview.classList.remove('show');
+            imagePreview.classList.remove('show');
+            
+            fileAnalyzeBtn.disabled = true;
+            imageAnalyzeBtn.disabled = true;
+            
+            document.getElementById('resultCard').classList.remove('show');
+            document.getElementById('processing').classList.remove('show');
+            document.getElementById('uploadSection').style.display = 'grid';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Model files (too large for GitHub)
+models/
+
+# Dataset (too large for GitHub)
+data set/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Uploads folder
+uploads/
+
+# Virtual environment
+venv/
+env/
+
+# VS Code settings
+.vscode/
+
+# Windows
+Thumbs.db
+Desktop.ini
