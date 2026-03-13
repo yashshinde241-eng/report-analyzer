@@ -1,368 +1,189 @@
-# Medical Report Analyzer - Setup Guide
+# Medical Report Analyzer
 
-Complete guide to set up your medical report analyzer with backend integration.
-
----
-
-## 📁 Project Structure
-
-```
-medical-report-analyzer/
-├── frontend/
-│   └── report-analyzer.html     # Your web interface
-├── backend/
-│   ├── flask_backend.py         # Flask backend option
-│   ├── fastapi_backend.py       # FastAPI backend option
-│   └── models/                  # Put your ML models here
-│       ├── file_model.pkl
-│       └── image_model.h5
-└── README.md
-```
+An AI-powered medical report analysis tool that detects **Diabetes** from clinical documents and **Pneumonia** from chest X-rays — with structured AI reasoning explaining every decision.
 
 ---
 
-## 🚀 Quick Start
+## What It Does
 
-### Option 1: Flask Backend (Recommended for beginners)
+- Upload a medical report (PDF, DOCX, TXT) → detects diabetes using TF-IDF + Logistic Regression
+- Upload a chest X-ray (JPG, PNG) → detects pneumonia using EfficientNet-B0
+- After every analysis, Groq AI (Llama 3) generates a structured explanation with Summary, Key Evidence, Model Reasoning, and a Clinical Note
 
-#### Step 1: Install Dependencies
+---
+
+## Project Structure
+
+```
+report-analyzer/
+├── report-analyzer.html      # Frontend (dark theme, purple accent)
+├── simple_backend.py         # Flask backend — main server
+├── test_backend.py           # API test script
+├── test_model.py             # Standalone image model test
+├── requirements.txt          # Python dependencies
+├── .env                      # API keys — DO NOT commit
+├── .env.example              # Template for .env
+├── .gitignore
+├── models/                   # Trained models — not in Git
+│   ├── pneumonia_model.pth   # EfficientNet-B0 (87.34% accuracy)
+│   ├── text_model.pkl        # Logistic Regression classifier
+│   └── vectorizer.pkl        # TF-IDF vectorizer
+└── data/
+    └── text_reports.json     # Synthetic diabetes training data
+```
+
+---
+
+## Models
+
+| Model | Task | Architecture | Accuracy |
+|-------|------|-------------|----------|
+| Pneumonia Detection | Chest X-ray classification | EfficientNet-B0 | 87.34% |
+| Diabetes Detection | Medical text classification | TF-IDF + Logistic Regression | 100%* |
+
+*Trained on synthetic data — accuracy reflects training data quality.
+
+**Training data:**
+- Chest X-rays: [Kaggle Chest X-Ray Dataset](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia) — 5,216 images
+- Diabetes reports: 1,000 synthetic clinical reports generated via `generate_text_data.py`
+
+**Hardware used:** NVIDIA RTX 3050 6GB (CUDA 11.8, PyTorch 2.7)
+
+---
+
+## Setup
+
+### 1. Clone the repo
+
 ```bash
-pip install flask flask-cors pillow PyPDF2 python-docx
+git clone https://github.com/your-username/report-analyzer.git
+cd report-analyzer
 ```
 
-#### Step 2: Start the Server
+### 2. Install dependencies
+
 ```bash
-python flask_backend.py
+pip install flask flask-cors pillow PyPDF2 python-docx torch torchvision joblib numpy requests python-dotenv
 ```
 
-Server runs at: `http://localhost:5000`
+### 3. Set up environment variables
 
-#### Step 3: Update Frontend Configuration
-In `report-analyzer.html`, line 415:
-```javascript
-const API_CONFIG = {
-    BASE_URL: 'http://localhost:5000',
-    // ...
-};
-```
-
----
-
-### Option 2: FastAPI Backend (Better for production)
-
-#### Step 1: Install Dependencies
 ```bash
-pip install fastapi uvicorn python-multipart pillow PyPDF2 python-docx
+cp .env.example .env
 ```
 
-#### Step 2: Start the Server
+Edit `.env` and add your free Groq API key:
+```
+GROQ_API_KEY=your_groq_key_here
+```
+
+Get a free key at [console.groq.com](https://console.groq.com) — no credit card needed.
+
+### 4. Add trained models
+
+Place your trained model files in the `models/` folder:
+```
+models/pneumonia_model.pth
+models/text_model.pkl
+models/vectorizer.pkl
+```
+
+> Models are excluded from Git due to file size. Train them using `train_model.py` and `train_text_model.py`.
+
+### 5. Run the backend
+
 ```bash
-uvicorn fastapi_backend:app --reload --host 0.0.0.0 --port 8000
+python simple_backend.py
 ```
 
-Server runs at: `http://localhost:8000`
-API docs at: `http://localhost:8000/docs`
+Server starts at `http://localhost:5000`
 
-#### Step 3: Update Frontend Configuration
-In `report-analyzer.html`, line 415:
-```javascript
-const API_CONFIG = {
-    BASE_URL: 'http://localhost:8000',
-    // ...
-};
-```
+### 6. Open the frontend
+
+Open `report-analyzer.html` in your browser — no web server needed.
 
 ---
 
-## 🤖 Integrating Your ML Models
+## Training the Models
 
-### For File Reports (Disease A)
+### Pneumonia model (EfficientNet-B0)
 
-**Flask** - Edit `flask_backend.py`, function `analyze_file_report()`:
-
-```python
-def analyze_file_report(file):
-    text = extract_text_from_file(file)
-    
-    # Load your model
-    import joblib  # or pickle, tensorflow, pytorch, etc.
-    model = joblib.load('models/file_model.pkl')
-    
-    # Preprocess text
-    # processed_text = your_preprocessing_function(text)
-    
-    # Make prediction
-    prediction = model.predict([text])
-    confidence = model.predict_proba([text])[0][1] * 100
-    
-    return {
-        'detected': bool(prediction[0]),
-        'confidence': int(confidence),
-        'diseaseName': 'Disease A',
-        'reportType': 'file'
-    }
-```
-
-**FastAPI** - Edit `fastapi_backend.py`, function `analyze_file_report()`:
-
-```python
-async def analyze_file_report(file: UploadFile) -> Dict:
-    text = await extract_text_from_file(file)
-    
-    # Load your model (load once at startup for better performance)
-    import joblib
-    model = joblib.load('models/file_model.pkl')
-    
-    # Preprocess and predict
-    prediction = model.predict([text])
-    confidence = model.predict_proba([text])[0][1] * 100
-    
-    return {
-        'detected': bool(prediction[0]),
-        'confidence': int(confidence),
-        'diseaseName': 'Disease A',
-        'reportType': 'file'
-    }
-```
-
----
-
-### For Image Reports (Disease B)
-
-**Flask** - Edit `flask_backend.py`, function `analyze_image_report()`:
-
-```python
-def analyze_image_report(file):
-    image = Image.open(file)
-    
-    # Load your model
-    from tensorflow import keras  # or pytorch, etc.
-    model = keras.models.load_model('models/image_model.h5')
-    
-    # Preprocess image
-    image = image.resize((224, 224))
-    image_array = np.array(image) / 255.0
-    image_array = np.expand_dims(image_array, axis=0)
-    
-    # Make prediction
-    prediction = model.predict(image_array)
-    confidence = prediction[0][1] * 100
-    
-    return {
-        'detected': bool(prediction[0][1] > 0.5),
-        'confidence': int(confidence),
-        'diseaseName': 'Disease B',
-        'reportType': 'image'
-    }
-```
-
-**FastAPI** - Similar pattern for `analyze_image_report()` function
-
----
-
-## 🧪 Testing the Integration
-
-### Test Backend Directly
-
-**Flask:**
+1. Download the [Chest X-Ray dataset](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia) from Kaggle
+2. Extract to `data set/chest_xray/`
+3. Run:
 ```bash
-curl -X POST http://localhost:5000/api/health
+python train_model.py
 ```
 
-**FastAPI:**
+### Diabetes text model (TF-IDF + Logistic Regression)
+
+1. Generate synthetic training data:
 ```bash
-curl -X GET http://localhost:8000/api/health
+python generate_text_data.py
 ```
-
-### Test File Upload
+2. Train the classifier:
 ```bash
-curl -X POST -F "report=@test_file.pdf" http://localhost:5000/api/analyze/file
-```
-
-### Test from Frontend
-1. Open `report-analyzer.html` in your browser
-2. Upload a test file
-3. Check browser console (F12) for request/response logs
-4. Check backend terminal for incoming requests
-
----
-
-## 🔧 Configuration Options
-
-### Frontend Configuration (`report-analyzer.html`)
-
-```javascript
-const API_CONFIG = {
-    // Development
-    BASE_URL: 'http://localhost:5000',
-    
-    // Production
-    // BASE_URL: 'https://your-domain.com',
-    
-    ENDPOINTS: {
-        FILE_ANALYSIS: '/api/analyze/file',
-        IMAGE_ANALYSIS: '/api/analyze/image'
-    },
-    
-    // Optional: Add authentication
-    AUTH_TOKEN: null,  // or 'Bearer your-token-here'
-};
-```
-
-### Adding Authentication (Optional)
-
-**Backend (Flask):**
-```python
-from functools import wraps
-from flask import request
-
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token or token != 'Bearer your-secret-token':
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return decorated
-
-@app.route('/api/analyze/file', methods=['POST'])
-@require_auth
-def analyze_file():
-    # ... your code
-```
-
-**Frontend:**
-```javascript
-const API_CONFIG = {
-    AUTH_TOKEN: 'Bearer your-secret-token',
-};
+python train_text_model.py
 ```
 
 ---
 
-## 🌐 Deployment
+## API Endpoints
 
-### Deploy Backend to Cloud
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/analyze/file` | Analyze a document report for diabetes |
+| POST | `/api/analyze/image` | Analyze a chest X-ray for pneumonia |
+| GET | `/api/health` | Check if the server is running |
 
-**Heroku:**
-```bash
-# Create Procfile
-echo "web: python flask_backend.py" > Procfile
+**Request:** `multipart/form-data` with field name `report`
 
-# Deploy
-heroku create your-app-name
-git push heroku main
-```
-
-**AWS/GCP/Azure:**
-- Package your backend as a Docker container
-- Deploy to cloud service (EC2, App Engine, Azure App Service)
-
-### Update Frontend for Production
-```javascript
-const API_CONFIG = {
-    BASE_URL: 'https://your-deployed-backend.com',
-    // ...
-};
-```
-
----
-
-## 🐛 Troubleshooting
-
-### CORS Errors
-**Error:** "Access-Control-Allow-Origin" blocked
-
-**Solution:** Backend CORS is already configured, but if issues persist:
-- Flask: Check `CORS(app)` is called
-- FastAPI: Check `CORSMiddleware` configuration
-- Ensure frontend and backend URLs match
-
-### Connection Refused
-**Error:** "Failed to fetch" or "Connection refused"
-
-**Solutions:**
-1. Ensure backend is running: Check terminal
-2. Verify URL matches: Flask=5000, FastAPI=8000
-3. Check firewall settings
-4. Try `http://localhost` instead of `http://127.0.0.1`
-
-### File Upload Fails
-**Error:** "Invalid file format" or "No file provided"
-
-**Solutions:**
-1. Check file size < 10MB
-2. Verify file extension is allowed
-3. Check browser console for error details
-4. Verify FormData is being sent correctly
-
-### Model Loading Errors
-**Error:** "FileNotFoundError" or "Model not found"
-
-**Solutions:**
-1. Ensure model file exists in correct path
-2. Use absolute paths: `os.path.join(os.path.dirname(__file__), 'models', 'model.pkl')`
-3. Check model format matches library (joblib, pickle, h5, etc.)
-
----
-
-## 📊 Expected Response Format
-
-Your backend must return JSON with this structure:
-
+**Response:**
 ```json
 {
-    "detected": true,          // boolean: true = disease detected
-    "confidence": 92,          // number: 0-100
-    "diseaseName": "Disease A" // string: name of disease
-}
-```
-
-Optional fields:
-```json
-{
-    "detected": true,
-    "confidence": 92,
-    "diseaseName": "Disease A",
-    "reportType": "file",      // 'file' or 'image'
-    "additionalInfo": "..."    // any extra information
+  "detected": true,
+  "confidence": 99.4,
+  "diseaseName": "Pneumonia",
+  "reportType": "image",
+  "reasoning": "**Summary**\n..."
 }
 ```
 
 ---
 
-## 📚 Next Steps
+## Tech Stack
 
-1. ✅ Choose Flask or FastAPI
-2. ✅ Install dependencies
-3. ✅ Start backend server
-4. ✅ Test with curl or Postman
-5. ✅ Integrate your ML models
-6. ✅ Test with frontend
-7. ✅ Deploy to production
-
----
-
-## 💡 Tips
-
-- **Development:** Use mock data first, then integrate real models
-- **Testing:** Test backend independently before connecting frontend
-- **Logging:** Add `print()` statements to debug request flow
-- **Performance:** Load models once at startup, not per request
-- **Security:** Add authentication for production deployment
-- **Error Handling:** Always validate inputs and return clear errors
+| Layer | Technology |
+|-------|-----------|
+| Frontend | HTML, CSS, JavaScript |
+| Backend | Python, Flask |
+| Image Model | PyTorch, EfficientNet-B0 |
+| Text Model | Scikit-learn, TF-IDF, Logistic Regression |
+| AI Reasoning | Groq API (Llama 3.1 — free tier) |
+| GPU | NVIDIA RTX 3050, CUDA 11.8 |
 
 ---
 
-## 📞 Need Help?
+## Test Reports
 
-Common issues and solutions are in the Troubleshooting section above.
+Five sample diabetes reports are included for testing and showcase:
 
-For model-specific questions:
-- TensorFlow: https://www.tensorflow.org/api_docs
-- PyTorch: https://pytorch.org/docs
-- Scikit-learn: https://scikit-learn.org/stable/documentation.html
+| File | Type | Expected Result |
+|------|------|----------------|
+| `01_Diabetes_Severe_Positive.docx` | HbA1c 9.8%, glucose 247 mg/dL | Detected |
+| `02_Diabetes_Mild_Prediabetes.docx` | HbA1c 6.3%, glucose 118 mg/dL | Detected |
+| `03_Diabetes_Negative_Normal.docx` | HbA1c 5.1%, glucose 88 mg/dL | Not detected |
+| `04_Diabetes_Borderline_IGT.docx` | OGTT — impaired glucose tolerance | Detected |
+| `05_Diabetes_Followup_Treatment.docx` | Known diabetic on Metformin | Detected |
 
 ---
 
-Good luck with your medical report analyzer! 🚀
+## Disclaimer
+
+This tool is for **educational purposes only**. It does not constitute medical advice or diagnosis. Always consult a qualified healthcare professional for proper evaluation and treatment.
+
+---
+
+## Academic Project
+
+Built as a student project demonstrating the integration of machine learning models with a web interface for medical report analysis.
