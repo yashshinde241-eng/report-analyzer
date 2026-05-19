@@ -1,929 +1,689 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Report Analyzer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg:         #0E0F14;
-            --surface:    #13151C;
-            --surface2:   #1A1D27;
-            --surface3:   #212533;
-            --border:     rgba(255,255,255,0.07);
-            --border2:    rgba(255,255,255,0.12);
-            --purple:     #8B7CF6;
-            --purple2:    #A899F8;
-            --purple-dim: rgba(139,124,246,0.12);
-            --purple-glow:rgba(139,124,246,0.06);
-            --text:       #E8EAF0;
-            --text2:      #8890A4;
-            --text3:      #454D61;
-            --success:    #34D399;
-            --danger:     #F87171;
-            --warn:       #FBBF24;
-        }
-
-        * { margin:0; padding:0; box-sizing:border-box; }
-
-        html, body {
-            height: 100%;
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            font-size: 14px;
-            line-height: 1.6;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        body::after {
-            content: '';
-            position: fixed;
-            top: -300px; left: 50%;
-            transform: translateX(-50%);
-            width: 900px; height: 600px;
-            background: radial-gradient(ellipse, rgba(139,124,246,0.06) 0%, transparent 65%);
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .app {
-            position: relative;
-            z-index: 1;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* ── HERO ── */
-        .hero {
-            padding: 60px 48px 40px;
-            max-width: 1000px;
-            margin: 0 auto;
-            width: 100%;
-            text-align: center;
-            animation: fadeUp 0.5s ease-out;
-        }
-
-        .hero-logo {
-            width: 48px; height: 48px;
-            background: var(--purple-dim);
-            border: 1px solid rgba(139,124,246,0.25);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-        }
-
-        .hero-logo svg { width: 22px; height: 22px; }
-
-        .hero h1 {
-            font-size: 2rem;
-            font-weight: 600;
-            letter-spacing: -0.5px;
-            color: var(--text);
-            margin-bottom: 10px;
-        }
-
-        .hero p {
-            font-size: 14px;
-            color: var(--text2);
-            font-weight: 400;
-        }
-
-        /* ── MAIN ── */
-        .main {
-            padding: 0 48px 80px;
-            max-width: 1000px;
-            margin: 0 auto;
-            width: 100%;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(16px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ── UPLOAD GRID ── */
-        #uploadSection {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        /* ── UPLOAD CARD ── */
-        .upload-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 24px;
-            transition: border-color 0.2s;
-            animation: fadeUp 0.5s ease-out both;
-        }
-
-        .upload-card:nth-child(2) { animation-delay: 0.07s; }
-
-        .upload-card:hover { border-color: rgba(139,124,246,0.2); }
-
-        .card-top {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            margin-bottom: 16px;
-        }
-
-        .card-icon-wrap {
-            width: 38px; height: 38px;
-            border-radius: 9px;
-            background: var(--surface3);
-            border: 1px solid var(--border2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .card-icon-wrap svg { width: 18px; height: 18px; stroke: var(--purple2); }
-
-        .card-badge {
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.6px;
-            text-transform: uppercase;
-            padding: 3px 9px;
-            border-radius: 100px;
-            color: var(--purple2);
-            background: var(--purple-dim);
-            border: 1px solid rgba(139,124,246,0.18);
-        }
-
-        .card-title {
-            font-size: 15px;
-            font-weight: 600;
-            letter-spacing: -0.2px;
-            margin-bottom: 5px;
-        }
-
-        .card-desc {
-            font-size: 12px;
-            color: var(--text2);
-            line-height: 1.6;
-            margin-bottom: 18px;
-        }
-
-        /* ── UPLOAD ZONE ── */
-        .upload-zone {
-            border: 1.5px dashed var(--border2);
-            border-radius: 10px;
-            padding: 28px 16px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .upload-zone:hover {
-            border-color: rgba(139,124,246,0.35);
-            background: var(--purple-glow);
-        }
-
-        .upload-zone.dragover {
-            border-color: var(--purple);
-            background: var(--purple-dim);
-        }
-
-        .uz-icon {
-            width: 36px; height: 36px;
-            margin: 0 auto 10px;
-            background: var(--surface3);
-            border: 1px solid var(--border2);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .uz-icon svg { width: 18px; height: 18px; stroke: var(--text2); }
-
-        .uz-text { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
-        .uz-hint { font-size: 11px; color: var(--text3); }
-
-        input[type="file"] { display: none; }
-
-        /* ── FILE PREVIEW ── */
-        .file-preview {
-            display: none;
-            align-items: center;
-            gap: 9px;
-            margin-top: 10px;
-            padding: 9px 12px;
-            background: var(--surface2);
-            border: 1px solid var(--border2);
-            border-radius: 8px;
-        }
-
-        .file-preview.show { display: flex; animation: slideIn 0.2s ease-out; }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .fp-icon {
-            width: 28px; height: 28px;
-            background: var(--purple-dim);
-            border-radius: 6px;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .fp-icon svg { width: 13px; height: 13px; stroke: var(--purple2); }
-
-        .fp-info { flex: 1; min-width: 0; }
-        .fp-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .fp-size { font-size: 11px; color: var(--text3); margin-top: 1px; }
-
-        .fp-remove {
-            background: none;
-            border: 1px solid var(--border2);
-            color: var(--text3);
-            padding: 3px 8px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 11px;
-            font-family: 'Inter', sans-serif;
-            font-weight: 500;
-            transition: all 0.15s;
-            white-space: nowrap;
-        }
-
-        .fp-remove:hover { border-color: var(--danger); color: var(--danger); }
-
-        /* ── ANALYZE BUTTON ── */
-        .btn-analyze {
-            width: 100%;
-            margin-top: 14px;
-            padding: 11px;
-            background: var(--purple-dim);
-            border: 1px solid rgba(139,124,246,0.22);
-            border-radius: 9px;
-            color: var(--purple2);
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-analyze:hover:not(:disabled) {
-            background: rgba(139,124,246,0.18);
-            border-color: rgba(139,124,246,0.38);
-            transform: translateY(-1px);
-        }
-
-        .btn-analyze:disabled { opacity: 0.28; cursor: not-allowed; }
-
-        /* ── PROCESSING ── */
-        #processing {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 24px;
-            padding: 64px 40px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-        }
-
-        #processing.show { display: flex; animation: fadeUp 0.4s ease-out; }
-
-        .proc-ring { position: relative; width: 64px; height: 64px; }
-
-        .proc-ring svg { width: 64px; height: 64px; animation: spin 2s linear infinite; }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .proc-ring-center {
-            position: absolute;
-            inset: 16px;
-            border-radius: 50%;
-            background: var(--purple-dim);
-            animation: breathe 2s ease-in-out infinite;
-        }
-
-        @keyframes breathe {
-            0%, 100% { transform: scale(1); opacity: 0.5; }
-            50%       { transform: scale(1.1); opacity: 1; }
-        }
-
-        .proc-label { font-size: 14px; font-weight: 600; color: var(--text); }
-
-        .proc-steps { display: flex; flex-direction: column; gap: 7px; width: 220px; }
-
-        .proc-step {
-            display: flex; align-items: center; gap: 8px;
-            font-size: 12px; color: var(--text3); transition: color 0.3s;
-        }
-
-        .proc-step.active { color: var(--purple2); }
-        .proc-step.done   { color: var(--success); }
-
-        .proc-step-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-
-        /* ── RESULT ── */
-        #resultCard {
-            display: none;
-            background: var(--surface);
-            border-radius: 14px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-        }
-
-        #resultCard.show { display: block; animation: fadeUp 0.45s ease-out; }
-        #resultCard.res-pos { border-color: rgba(248,113,113,0.18); }
-        #resultCard.res-neg { border-color: rgba(52,211,153,0.18); }
-
-        .res-topbar { height: 3px; }
-        .res-pos .res-topbar { background: linear-gradient(90deg, var(--danger), #FB923C); }
-        .res-neg .res-topbar { background: linear-gradient(90deg, var(--success), var(--purple2)); }
-
-        .res-header {
-            padding: 28px 32px 24px;
-            display: flex;
-            align-items: flex-start;
-            gap: 16px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .res-avatar {
-            width: 52px; height: 52px;
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 22px; flex-shrink: 0;
-        }
-
-        .res-pos .res-avatar { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.22); }
-        .res-neg .res-avatar { background: rgba(52,211,153,0.1);  border: 1px solid rgba(52,211,153,0.22); }
-
-        .res-status-label {
-            font-size: 10px; font-weight: 700;
-            letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 5px;
-        }
-
-        .res-pos .res-status-label { color: var(--danger); }
-        .res-neg .res-status-label { color: var(--success); }
-
-        .res-title {
-            font-size: 1.4rem; font-weight: 600;
-            letter-spacing: -0.3px; color: var(--text); margin-bottom: 6px;
-        }
-
-        .res-msg { font-size: 12px; color: var(--text2); line-height: 1.65; max-width: 540px; }
-
-        .res-metrics {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .res-metric { padding: 18px 24px; border-right: 1px solid var(--border); }
-        .res-metric:last-child { border-right: none; }
-
-        .res-metric-label {
-            font-size: 10px; font-weight: 600;
-            letter-spacing: 0.8px; text-transform: uppercase;
-            color: var(--text3); margin-bottom: 5px;
-        }
-
-        .res-metric-value { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.4px; }
-        .res-metric-value.v-purple { color: var(--purple2); }
-        .res-metric-value.v-green  { color: var(--success); }
-        .res-metric-value.v-red    { color: var(--danger); }
-        .res-metric-value.v-small  { font-size: 12px; font-weight: 500; color: var(--text2); padding-top: 5px; letter-spacing: 0; }
-
-        .res-conf-bar { padding: 18px 24px; border-bottom: 1px solid var(--border); }
-
-        .res-conf-header {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px;
-        }
-
-        .res-conf-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); }
-        .res-conf-pct { font-size: 12px; font-weight: 600; color: var(--text2); }
-
-        .res-conf-track { height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
-
-        .res-conf-fill {
-            height: 100%; border-radius: 2px; width: 0%;
-            transition: width 1s cubic-bezier(0.4,0,0.2,1);
-        }
-
-        .res-pos .res-conf-fill { background: linear-gradient(90deg, var(--danger), #FB923C); }
-        .res-neg .res-conf-fill { background: linear-gradient(90deg, var(--success), var(--purple2)); }
-
-        /* ── REASONING ── */
-        .res-reasoning { padding: 18px 24px; border-bottom: 1px solid var(--border); }
-
-        .res-reasoning-label {
-            font-size: 10px; font-weight: 600;
-            letter-spacing: 0.8px; text-transform: uppercase;
-            color: var(--text3); margin-bottom: 14px;
-        }
-
-        /* structured text reasoning */
-        .reasoning-text { display: flex; flex-direction: column; gap: 14px; }
-
-        /* .rt-section {} */
-
-        .rt-heading {
-            font-size: 12px; font-weight: 600;
-            color: var(--purple2);
-            margin-bottom: 6px;
-            letter-spacing: 0.2px;
-        }
-
-        .rt-body {
-            font-size: 13px; color: var(--text2);
-            line-height: 1.7;
-        }
-
-        .rt-bullets { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-
-        .rt-bullet {
-            display: flex; gap: 10px; align-items: flex-start;
-            font-size: 13px; color: var(--text2); line-height: 1.65;
-        }
-
-        .rt-bullet-dot {
-            width: 5px; height: 5px; border-radius: 50%;
-            background: var(--purple); flex-shrink: 0; margin-top: 7px;
-        }
-
-        .reasoning-loading {
-            display: flex; align-items: center; gap: 10px;
-            font-size: 13px; color: var(--text3);
-        }
-
-        .rl-spinner {
-            width: 14px; height: 14px;
-            border: 2px solid var(--border2);
-            border-top-color: var(--purple2);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            flex-shrink: 0;
-        }
-
-        .res-disclaimer { padding: 16px 24px; border-bottom: 1px solid var(--border); }
-
-        .disclaimer-box {
-            display: flex; gap: 10px; padding: 12px 14px;
-            background: rgba(251,191,36,0.04);
-            border: 1px solid rgba(251,191,36,0.1);
-            border-radius: 8px;
-        }
-
-        .disclaimer-box-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
-
-        .disclaimer-box-text { font-size: 11px; color: var(--text2); line-height: 1.65; }
-        .disclaimer-box-text strong { color: var(--warn); font-weight: 600; }
-
-        .res-footer {
-            padding: 14px 24px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-
-        .res-meta { font-size: 11px; color: var(--text3); }
-
-        .btn-new {
-            padding: 7px 14px;
-            background: var(--surface2);
-            border: 1px solid var(--border2);
-            border-radius: 7px;
-            color: var(--text2);
-            font-family: 'Inter', sans-serif;
-            font-size: 12px; font-weight: 600;
-            cursor: pointer; transition: all 0.15s;
-        }
-
-        .btn-new:hover { border-color: var(--purple); color: var(--purple2); background: var(--purple-dim); }
-
-        /* ── FOOTER ── */
-        .page-footer {
-            padding: 16px 48px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .pf-left { font-size: 11px; color: var(--text3); }
-
-        .pf-right { display: flex; gap: 16px; }
-
-        .pf-tag { font-size: 11px; color: var(--text3); }
-
-        /* ── RESPONSIVE ── */
-        @media (max-width: 720px) {
-            .hero { padding: 40px 20px 28px; }
-            .main { padding: 0 20px 60px; }
-            #uploadSection { grid-template-columns: 1fr; }
-            .res-metrics { grid-template-columns: 1fr 1fr; }
-            .res-metric:nth-child(3) { grid-column: span 2; border-top: 1px solid var(--border); border-right: none; }
-            .res-header { flex-direction: column; padding: 20px; }
-            .res-conf-bar, .res-disclaimer, .res-footer, .res-metric { padding: 14px 20px; }
-            .page-footer { padding: 14px 20px; flex-direction: column; gap: 6px; }
-        }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Report Analyzer — Smart Triage</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & Variables ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #0a0a0f;
+  --bg2:         #10101a;
+  --bg3:         #16162a;
+  --surface:     rgba(255,255,255,.04);
+  --surface-h:   rgba(255,255,255,.07);
+  --border:      rgba(255,255,255,.08);
+  --purple:      #9b59f5;
+  --purple-dim:  #6d3fcf;
+  --purple-glow: rgba(155,89,245,.25);
+  --text:        #e8e8f0;
+  --text-dim:    #888899;
+  --red:         #ff4d6d;
+  --red-dim:     rgba(255,77,109,.15);
+  --yellow:      #f5c518;
+  --yellow-dim:  rgba(245,197,24,.13);
+  --green:       #3dffa0;
+  --green-dim:   rgba(61,255,160,.12);
+  --mono:        'JetBrains Mono', monospace;
+  --sans:        'Space Grotesk', sans-serif;
+  --radius:      12px;
+  --radius-lg:   18px;
+  --shadow:      0 8px 32px rgba(0,0,0,.55);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Background grid ───────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(155,89,245,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(155,89,245,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* ── Layout ────────────────────────────────────────────────────── */
+.wrapper { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; position: relative; z-index: 1; }
+
+/* ── Header ────────────────────────────────────────────────────── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 32px 0 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 36px;
+  flex-wrap: wrap; gap: 16px;
+}
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon {
+  width: 42px; height: 42px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--purple-dim), var(--purple));
+  display: grid; place-items: center; font-size: 20px;
+  box-shadow: 0 0 20px var(--purple-glow);
+}
+.logo h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -.02em; }
+.logo span { color: var(--purple); }
+
+/* Mode toggle */
+.mode-toggle {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 40px; padding: 4px;
+}
+.mode-btn {
+  padding: 6px 18px; border-radius: 30px; border: none;
+  font-family: var(--sans); font-size: .8rem; font-weight: 500;
+  cursor: pointer; transition: all .2s;
+  background: transparent; color: var(--text-dim);
+}
+.mode-btn.active {
+  background: var(--purple); color: #fff;
+  box-shadow: 0 0 14px var(--purple-glow);
+}
+
+/* ── Section titles ────────────────────────────────────────────── */
+.section-title {
+  font-size: .7rem; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--purple);
+  margin-bottom: 16px;
+}
+
+/* ── Cards / Glass ─────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  backdrop-filter: blur(12px);
+  transition: border-color .2s;
+}
+.card:hover { border-color: rgba(155,89,245,.3); }
+
+/* ── Original analysis panel ───────────────────────────────────── */
+#panel-single { display: block; }
+#panel-triage { display: none; }
+
+/* ── Upload zone ───────────────────────────────────────────────── */
+.upload-zone {
+  border: 2px dashed rgba(155,89,245,.35);
+  border-radius: var(--radius);
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--purple);
+  background: rgba(155,89,245,.06);
+}
+.upload-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
+.upload-zone p { color: var(--text-dim); font-size: .875rem; line-height: 1.6; }
+.upload-zone p strong { color: var(--text); }
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 22px; border-radius: 8px; border: none;
+  font-family: var(--sans); font-size: .875rem; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.btn-primary {
+  background: var(--purple); color: #fff;
+  box-shadow: 0 0 16px var(--purple-glow);
+}
+.btn-primary:hover { background: #b070ff; box-shadow: 0 0 24px var(--purple-glow); }
+.btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { color: var(--text); border-color: rgba(255,255,255,.2); }
+
+/* ── Result box ────────────────────────────────────────────────── */
+.result-box {
+  margin-top: 20px; display: none;
+  animation: fadeUp .35s ease both;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.result-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
+}
+.badge {
+  padding: 4px 14px; border-radius: 30px;
+  font-size: .75rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.badge-detected   { background: var(--red-dim);    color: var(--red);   border: 1px solid rgba(255,77,109,.3); }
+.badge-normal     { background: var(--green-dim);  color: var(--green); border: 1px solid rgba(61,255,160,.25); }
+.badge-pending    { background: var(--yellow-dim); color: var(--yellow);border: 1px solid rgba(245,197,24,.25); }
+
+.confidence-bar-wrap { margin: 12px 0; }
+.confidence-label {
+  display: flex; justify-content: space-between;
+  font-size: .75rem; color: var(--text-dim); margin-bottom: 6px;
+}
+.confidence-bar {
+  height: 6px; border-radius: 4px; background: var(--border); overflow: hidden;
+}
+.confidence-fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--purple-dim), var(--purple));
+  transition: width .6s ease;
+}
+
+.reasoning-box {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px;
+  font-size: .82rem; line-height: 1.75; color: var(--text-dim);
+  white-space: pre-wrap; font-family: var(--mono);
+  max-height: 320px; overflow-y: auto;
+}
+
+/* ── Triage dashboard ──────────────────────────────────────────── */
+.triage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+@media (max-width: 640px) { .triage-grid { grid-template-columns: 1fr; } }
+
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  text-align: center;
+}
+.stat-value { font-size: 2rem; font-weight: 700; letter-spacing: -.03em; }
+.stat-label { font-size: .72rem; color: var(--text-dim); letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
+.stat-red    .stat-value { color: var(--red); }
+.stat-yellow .stat-value { color: var(--yellow); }
+.stat-green  .stat-value { color: var(--green); }
+.stat-purple .stat-value { color: var(--purple); }
+
+/* Progress ring */
+.progress-ring-wrap { display: flex; align-items: center; gap: 16px; margin: 8px 0 20px; }
+.progress-label { font-size: .8rem; color: var(--text-dim); }
+
+/* Upload progress item */
+.upload-list { list-style: none; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.upload-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg3); border-radius: 8px; padding: 8px 14px;
+  font-size: .8rem; animation: fadeUp .25s ease both;
+}
+.upload-item .file-name { color: var(--text-dim); font-family: var(--mono); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upload-item .file-status { display: flex; align-items: center; gap: 6px; }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--purple); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Priority table ────────────────────────────────────────────── */
+.triage-table-wrap {
+  overflow-x: auto; border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+table {
+  width: 100%; border-collapse: collapse;
+  font-size: .82rem;
+}
+thead th {
+  background: var(--bg3);
+  padding: 12px 16px; text-align: left;
+  font-size: .7rem; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+thead th.sort-active { color: var(--purple); }
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface-h); }
+tbody td { padding: 11px 16px; vertical-align: middle; }
+.td-filename { font-family: var(--mono); color: var(--text-dim); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-pred { font-weight: 600; }
+.td-pred.pneumonia { color: var(--red); }
+.td-pred.normal    { color: var(--green); }
+.td-score { font-family: var(--mono); font-weight: 600; }
+
+/* Priority pill */
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+}
+.pill-high   { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(255,77,109,.3); }
+.pill-medium { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,197,24,.25); }
+.pill-low    { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(61,255,160,.2); }
+.pill-pending{ background: var(--surface);    color: var(--text-dim); border: 1px solid var(--border); }
+
+/* Severity bar in table */
+.sev-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.sev-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; min-width: 60px; }
+.sev-fill { height: 100%; border-radius: 3px; transition: width .5s ease; }
+.sev-fill.high   { background: var(--red); }
+.sev-fill.medium { background: var(--yellow); }
+.sev-fill.low    { background: var(--green); }
+
+/* Empty state */
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-dim);
+}
+.empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: .4; }
+.empty-state p { font-size: .875rem; }
+
+/* ── Toast ─────────────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 20px;
+  font-size: .82rem; max-width: 320px;
+  box-shadow: var(--shadow);
+  transform: translateY(20px); opacity: 0;
+  transition: all .25s ease;
+  pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.toast.error { border-color: rgba(255,77,109,.4); color: var(--red); }
+.toast.success { border-color: rgba(61,255,160,.3); color: var(--green); }
+
+/* ── Scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(155,89,245,.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--purple); }
+</style>
 </head>
 <body>
-<div class="app">
 
-    <!-- HERO -->
-    <div class="hero">
-        <div class="hero-logo">
-            <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="10" y="3" width="2" height="16" rx="1" fill="#8B7CF6"/>
-                <rect x="3" y="10" width="16" height="2" rx="1" fill="#8B7CF6"/>
-            </svg>
-        </div>
-        <h1>Medical Report Analyzer</h1>
-        <p>Upload a clinical document or chest X-ray to detect diabetes or pneumonia using machine learning.</p>
+<div class="wrapper">
+
+  <!-- ── Header ──────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">🫁</div>
+      <h1>Report <span>Analyzer</span></h1>
+    </div>
+    <div class="mode-toggle" role="tablist" aria-label="Mode selector">
+      <button class="mode-btn active" id="btn-single" onclick="switchMode('single')" role="tab" aria-selected="true">Analysis</button>
+      <button class="mode-btn"        id="btn-triage" onclick="switchMode('triage')" role="tab" aria-selected="false">⚡ Triage</button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PANEL A — Original single-file analysis
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="panel-single">
+
+    <!-- Chest X-ray → Pneumonia -->
+    <div class="card">
+      <p class="section-title">Chest X-Ray · Pneumonia</p>
+      <div class="upload-zone" id="zone-img" ondragover="onDrag(event,this)" ondragleave="offDrag(this)" ondrop="onDropImg(event)">
+        <input type="file" id="file-img" accept=".jpg,.jpeg,.png" onchange="handleImg()">
+        <div class="upload-icon">🩻</div>
+        <p><strong>Drop an X-ray here</strong><br>JPG or PNG</p>
+      </div>
+      <div style="margin-top:14px; text-align:right;">
+        <button class="btn btn-primary" id="analyze-img-btn" onclick="analyzeImg()" disabled>Analyze X-Ray</button>
+      </div>
+      <div class="result-box" id="result-img"></div>
     </div>
 
-    <!-- MAIN -->
-    <main class="main">
+  </div><!-- /panel-single -->
 
-        <!-- UPLOAD -->
-        <div id="uploadSection">
 
-            <!-- Document -->
-            <div class="upload-card">
-                <div class="card-top">
-                    <div class="card-icon-wrap">
-                        <svg viewBox="0 0 20 20" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8z" stroke-width="1.5"/>
-                            <polyline points="12 2 12 8 18 8" stroke-width="1.5"/>
-                            <line x1="7" y1="11" x2="13" y2="11" stroke-width="1.5"/>
-                            <line x1="7" y1="14" x2="10" y2="14" stroke-width="1.5"/>
-                        </svg>
-                    </div>
-                    <span class="card-badge">Diabetes</span>
-                </div>
-                <div class="card-title">Document Report</div>
-                <p class="card-desc">Upload a medical report file. The text classifier analyzes it for diabetic indicators using TF-IDF and Logistic Regression.</p>
-                <div class="upload-zone" id="fileUploadZone" onclick="document.getElementById('fileInput').click()">
-                    <div class="uz-icon">
-                        <svg viewBox="0 0 20 20" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="10 14 10 6" stroke-width="1.5"/>
-                            <polyline points="7 9 10 6 13 9" stroke-width="1.5"/>
-                            <path d="M15 16H5a4 4 0 0 1-1-7.8A7 7 0 0 1 18 10a5 5 0 0 1-3 6z" stroke-width="1.5"/>
-                        </svg>
-                    </div>
-                    <div class="uz-text">Drop file here or click to browse</div>
-                    <div class="uz-hint">PDF · DOC · DOCX · TXT — max 10 MB</div>
-                </div>
-                <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt"/>
-                <div class="file-preview" id="filePreview">
-                    <div class="fp-icon">
-                        <svg viewBox="0 0 14 14" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M8 1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4z" stroke-width="1.2"/>
-                            <polyline points="8 1 8 4 11 4" stroke-width="1.2"/>
-                        </svg>
-                    </div>
-                    <div class="fp-info">
-                        <div class="fp-name" id="fileName"></div>
-                        <div class="fp-size" id="fileSize"></div>
-                    </div>
-                    <button class="fp-remove" onclick="removeFile('file')">Remove</button>
-                </div>
-                <button class="btn-analyze" id="fileAnalyzeBtn" disabled onclick="analyzeReport('file')">Analyze for Diabetes</button>
-            </div>
+  <!-- ═══════════════════════════════════════════════════════════════
+       PANEL B — Triage Dashboard
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="panel-triage">
 
-            <!-- Image -->
-            <div class="upload-card">
-                <div class="card-top">
-                    <div class="card-icon-wrap">
-                        <svg viewBox="0 0 20 20" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M18 15a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3l2-2h4l2 2h1a2 2 0 0 1 2 2z" stroke-width="1.5"/>
-                            <circle cx="10" cy="11" r="3" stroke-width="1.5"/>
-                        </svg>
-                    </div>
-                    <span class="card-badge">Pneumonia</span>
-                </div>
-                <div class="card-title">Chest X-Ray Image</div>
-                <p class="card-desc">Upload a chest X-ray. EfficientNet-B0, trained on 5,216 clinical images, classifies the scan for pneumonia.</p>
-                <div class="upload-zone" id="imageUploadZone" onclick="document.getElementById('imageInput').click()">
-                    <div class="uz-icon">
-                        <svg viewBox="0 0 20 20" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="4" width="16" height="12" rx="2" stroke-width="1.5"/>
-                            <circle cx="10" cy="10" r="3" stroke-width="1.5"/>
-                        </svg>
-                    </div>
-                    <div class="uz-text">Drop image here or click to browse</div>
-                    <div class="uz-hint">JPG · PNG · JPEG — max 10 MB</div>
-                </div>
-                <input type="file" id="imageInput" accept="image/jpeg,image/png,image/jpg"/>
-                <div class="file-preview" id="imagePreview">
-                    <div class="fp-icon">
-                        <svg viewBox="0 0 14 14" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="1" y="2" width="12" height="10" rx="1.5" stroke-width="1.2"/>
-                            <circle cx="7" cy="7" r="2.5" stroke-width="1.2"/>
-                        </svg>
-                    </div>
-                    <div class="fp-info">
-                        <div class="fp-name" id="imageName"></div>
-                        <div class="fp-size" id="imageSize"></div>
-                    </div>
-                    <button class="fp-remove" onclick="removeFile('image')">Remove</button>
-                </div>
-                <button class="btn-analyze" id="imageAnalyzeBtn" disabled onclick="analyzeReport('image')">Analyze for Pneumonia</button>
-            </div>
+    <!-- Stats row -->
+    <div class="triage-grid" style="grid-template-columns:repeat(4,1fr);">
+      <div class="stat-card stat-purple"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total Queued</div></div>
+      <div class="stat-card stat-red">   <div class="stat-value" id="stat-high">0</div> <div class="stat-label">High Priority</div></div>
+      <div class="stat-card stat-yellow"><div class="stat-value" id="stat-med">0</div>  <div class="stat-label">Medium Priority</div></div>
+      <div class="stat-card stat-green"> <div class="stat-value" id="stat-low">0</div>  <div class="stat-label">Low Priority</div></div>
+    </div>
+
+    <!-- Upload card -->
+    <div class="card" style="margin-bottom:20px;">
+      <p class="section-title">Bulk Upload · Chest X-Rays</p>
+
+      <div class="upload-zone" id="zone-bulk" ondragover="onDrag(event,this)" ondragleave="offDrag(this)" ondrop="onDropBulk(event)">
+        <input type="file" id="file-bulk" accept=".jpg,.jpeg,.png" multiple onchange="handleBulkSelect()">
+        <div class="upload-icon">🗂️</div>
+        <p><strong>Select or drop 1–20 chest X-ray images</strong><br>JPG / PNG — batch processed with severity scoring</p>
+      </div>
+
+      <ul class="upload-list" id="upload-list"></ul>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:10px;">
+        <span id="bulk-file-count" style="font-size:.8rem;color:var(--text-dim)">No files selected</span>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" onclick="clearTriage()">Clear Queue</button>
+          <button class="btn btn-primary" id="bulk-submit-btn" onclick="submitBulk()" disabled>Run Triage</button>
         </div>
+      </div>
+    </div>
 
-        <!-- PROCESSING -->
-        <div id="processing">
-            <div class="proc-ring">
-                <svg viewBox="0 0 64 64" fill="none">
-                    <circle cx="32" cy="32" r="26" stroke="rgba(139,124,246,0.1)" stroke-width="2"/>
-                    <circle cx="32" cy="32" r="26"
-                            stroke="url(#pg)" stroke-width="2"
-                            stroke-dasharray="40 123" stroke-linecap="round"/>
-                    <defs>
-                        <linearGradient id="pg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-                            <stop offset="0%" stop-color="#8B7CF6"/>
-                            <stop offset="100%" stop-color="#34D399"/>
-                        </linearGradient>
-                    </defs>
-                </svg>
-                <div class="proc-ring-center"></div>
-            </div>
-            <div class="proc-label">Analyzing report…</div>
-            <div class="proc-steps">
-                <div class="proc-step active" id="step1"><div class="proc-step-dot"></div>Preprocessing input</div>
-                <div class="proc-step" id="step2"><div class="proc-step-dot"></div>Running model inference</div>
-                <div class="proc-step" id="step3"><div class="proc-step-dot"></div>Generating AI reasoning</div>
-            </div>
+    <!-- Priority table -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <p class="section-title" style="margin-bottom:0">Priority Queue — Severity Descending</p>
+        <button class="btn btn-ghost" style="font-size:.75rem;padding:6px 14px;" onclick="refreshQueue()">↻ Refresh</button>
+      </div>
+
+      <div class="triage-table-wrap" id="triage-table-wrap">
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <p>No analyses yet. Upload X-rays to populate the queue.</p>
         </div>
+      </div>
+    </div>
 
-        <!-- RESULT -->
-        <div id="resultCard">
-            <div class="res-topbar"></div>
-            <div class="res-header">
-                <div class="res-avatar" id="resAvatar"></div>
-                <div>
-                    <div class="res-status-label" id="resStatusLabel"></div>
-                    <div class="res-title" id="resTitle"></div>
-                    <div class="res-msg" id="resMsg"></div>
-                </div>
-            </div>
-            <div class="res-metrics">
-                <div class="res-metric">
-                    <div class="res-metric-label">Confidence</div>
-                    <div class="res-metric-value v-purple" id="mConf">—</div>
-                </div>
-                <div class="res-metric">
-                    <div class="res-metric-label">Result</div>
-                    <div class="res-metric-value" id="mResult">—</div>
-                </div>
-                <div class="res-metric">
-                    <div class="res-metric-label">Model used</div>
-                    <div class="res-metric-value v-small" id="mModel">—</div>
-                </div>
-            </div>
-            <div class="res-conf-bar">
-                <div class="res-conf-header">
-                    <div class="res-conf-label">Confidence score</div>
-                    <div class="res-conf-pct" id="confPct">—</div>
-                </div>
-                <div class="res-conf-track">
-                    <div class="res-conf-fill" id="confFill"></div>
-                </div>
-            </div>
-            <div class="res-reasoning" id="resReasoning">
-                <div class="res-reasoning-label">Model reasoning</div>
-                <div id="reasoningContent"></div>
-            </div>
-            <!-- <div class="res-disclaimer">
-                <div class="disclaimer-box">
-                    <div class="disclaimer-box-icon">⚠️</div>
-                    <div class="disclaimer-box-text">
-                        <strong>Disclaimer —</strong> This tool is for educational purposes only and does not constitute medical advice. Always consult a qualified healthcare professional for diagnosis and treatment.
-                    </div>
-                </div>
-            </div> -->
-            <div class="res-footer">
-                <div class="res-meta" id="resMeta"></div>
-                <button class="btn-new" onclick="resetAnalysis()">← New analysis</button>
-            </div>
-        </div>
+  </div><!-- /panel-triage -->
 
-    </main>
+</div><!-- /wrapper -->
 
-    <!-- FOOTER -->
-    <footer class="page-footer">
-        <div class="pf-left">Medical Report Analyzer · Academic Project</div>
-        <div class="pf-right">
-            <span class="pf-tag">EfficientNet-B0</span>
-            <span class="pf-tag">TF-IDF + Logistic Regression</span>
-            <span class="pf-tag">PyTorch · CUDA</span>
-        </div>
-    </footer>
+<!-- Toast -->
+<div class="toast" id="toast"></div>
 
-</div>
+<style>
+  @media (max-width: 600px) {
+    .triage-grid { grid-template-columns: 1fr 1fr !important; }
+  }
+</style>
 
 <script>
-    const API = { BASE: 'http://localhost:5000', FILE: '/api/analyze/file', IMAGE: '/api/analyze/image' };
-    let curFile = null, curImg = null;
+/* ── Config ──────────────────────────────────────────────────── */
+const API = 'http://localhost:5000';
 
-    document.getElementById('fileInput').addEventListener('change', e => pick(e.target.files[0], 'file'));
-    document.getElementById('imageInput').addEventListener('change', e => pick(e.target.files[0], 'image'));
+/* ── Mode switching ──────────────────────────────────────────── */
+function switchMode(mode) {
+  document.getElementById('panel-single').style.display = mode === 'single' ? 'block' : 'none';
+  document.getElementById('panel-triage').style.display = mode === 'triage' ? 'block' : 'none';
+  document.getElementById('btn-single').classList.toggle('active', mode === 'single');
+  document.getElementById('btn-triage').classList.toggle('active', mode === 'triage');
+  if (mode === 'triage') refreshQueue();
+}
 
-    [['fileUploadZone','file'],['imageUploadZone','image']].forEach(([id,t]) => {
-        const z = document.getElementById(id);
-        z.addEventListener('dragover',  e => { e.preventDefault(); z.classList.add('dragover'); });
-        z.addEventListener('dragleave', ()  => z.classList.remove('dragover'));
-        z.addEventListener('drop', e => { e.preventDefault(); z.classList.remove('dragover'); pick(e.dataTransfer.files[0], t); });
-    });
+/* ── Toast ───────────────────────────────────────────────────── */
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
 
-    function pick(file, type) {
-        if (!file) return;
-        if (file.size > 10 * 1024 * 1024) { alert('File exceeds 10 MB limit.'); return; }
-        if (type === 'file') {
-            curFile = file;
-            document.getElementById('fileName').textContent = file.name;
-            document.getElementById('fileSize').textContent = fmtSize(file.size);
-            document.getElementById('filePreview').classList.add('show');
-            document.getElementById('fileAnalyzeBtn').disabled = false;
-        } else {
-            curImg = file;
-            document.getElementById('imageName').textContent = file.name;
-            document.getElementById('imageSize').textContent = fmtSize(file.size);
-            document.getElementById('imagePreview').classList.add('show');
-            document.getElementById('imageAnalyzeBtn').disabled = false;
-        }
+/* ── Drag helpers ────────────────────────────────────────────── */
+function onDrag(e, el)  { e.preventDefault(); el.classList.add('drag-over'); }
+function offDrag(el)    { el.classList.remove('drag-over'); }
+function onDropImg(e) {
+  e.preventDefault(); offDrag(document.getElementById('zone-img'));
+  const inp = document.getElementById('file-img');
+  const dt  = new DataTransfer();
+  dt.items.add(e.dataTransfer.files[0]);
+  inp.files = dt.files;
+  handleImg();
+}
+function onDropBulk(e) {
+  e.preventDefault(); offDrag(document.getElementById('zone-bulk'));
+  const inp = document.getElementById('file-bulk');
+  const dt  = new DataTransfer();
+  Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+  inp.files = dt.files;
+  handleBulkSelect();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PANEL A  —  Single X-ray analysis
+══════════════════════════════════════════════════════════════ */
+let imgFile = null;
+
+function handleImg() {
+  imgFile = document.getElementById('file-img').files[0] || null;
+  document.getElementById('analyze-img-btn').disabled = !imgFile;
+  if (imgFile) document.getElementById('zone-img').querySelector('p').innerHTML = `<strong>${imgFile.name}</strong>`;
+}
+
+async function analyzeImg() {
+  if (!imgFile) return;
+  const btn = document.getElementById('analyze-img-btn');
+  const box = document.getElementById('result-img');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing…';
+  box.style.display = 'none';
+  const fd = new FormData();
+  fd.append('file', imgFile);
+  try {
+    const res  = await fetch(API + '/api/analyze/image', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Server error');
+    const badgeClass = data.detected ? 'badge-detected' : 'badge-normal';
+    const badgeText  = data.detected ? 'Pneumonia Detected' : 'Normal';
+    box.innerHTML = `
+      <div class="result-header">
+        <strong style="font-size:.95rem;">Pneumonia Analysis</strong>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="confidence-bar-wrap">
+        <div class="confidence-label"><span>Confidence</span><span>${data.confidence}%</span></div>
+        <div class="confidence-bar"><div class="confidence-fill" style="width:${data.confidence}%"></div></div>
+      </div>
+      <p style="font-size:.75rem;color:var(--text-dim);margin:10px 0 6px;">AI Reasoning (Groq · Llama 3.1)</p>
+      <div class="reasoning-box">${data.reasoning || 'No reasoning returned.'}</div>`;
+    box.style.display = 'block';
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze X-Ray';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PANEL B  —  Triage  (live per-image processing)
+══════════════════════════════════════════════════════════════ */
+let selectedFiles  = [];
+let liveQueue      = [];   // in-memory queue, re-sorted after each result
+let isProcessing   = false;
+
+// ── File selection ────────────────────────────────────────────
+function handleBulkSelect() {
+  const inp = document.getElementById('file-bulk');
+  selectedFiles = Array.from(inp.files).slice(0, 20);
+  document.getElementById('bulk-file-count').textContent = selectedFiles.length
+    ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
+    : 'No files selected';
+  document.getElementById('bulk-submit-btn').disabled = selectedFiles.length === 0;
+  // Show queued list
+  renderUploadList(selectedFiles.map(f => ({ name: f.name, state: 'queued' })));
+}
+
+// ── Upload list (sidebar checklist) ──────────────────────────
+function setItemState(i, state, detail = '') {
+  const el = document.getElementById(`uitem-${i}`);
+  if (!el) return;
+  const icons = {
+    queued:     `<span style="color:var(--text-dim)">○</span> Queued`,
+    processing: `<span class="spinner"></span> Analyzing…`,
+    done:       `<span style="color:var(--green)">✓</span> Done`,
+    error:      `<span style="color:var(--red)">✗</span> ${detail || 'Error'}`,
+  };
+  el.querySelector('.file-status').innerHTML = icons[state] || '';
+}
+
+function renderUploadList(items) {
+  document.getElementById('upload-list').innerHTML = items.map((it, i) => `
+    <li class="upload-item" id="uitem-${i}">
+      <span class="file-name" title="${it.name}">${it.name}</span>
+      <span class="file-status">
+        ${it.state === 'queued' ? '<span style="color:var(--text-dim)">○</span> Queued' : ''}
+      </span>
+    </li>`).join('');
+}
+
+// ── Main: process one file at a time, update table live ───────
+async function submitBulk() {
+  if (!selectedFiles.length || isProcessing) return;
+  isProcessing = true;
+
+  const btn = document.getElementById('bulk-submit-btn');
+  btn.disabled = true;
+  btn.textContent = `0 / ${selectedFiles.length} done`;
+
+  // Reset in-memory queue for this batch
+  liveQueue = [];
+  renderQueue(liveQueue);   // show empty state while we start
+
+  let doneCount = 0, errCount = 0;
+
+  for (let i = 0; i < selectedFiles.length; i++) {
+    const file = selectedFiles[i];
+    setItemState(i, 'processing');
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+      const res  = await fetch(API + '/api/triage/analyze-one', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!res.ok || data.status === 'Error') {
+        throw new Error(data.error || 'Model error');
+      }
+
+      // Push result into live queue and re-sort by severity descending
+      liveQueue.push(data);
+      liveQueue.sort((a, b) => (b.severity_score ?? 0) - (a.severity_score ?? 0));
+
+      setItemState(i, 'done');
+      doneCount++;
+    } catch (err) {
+      setItemState(i, 'error', err.message.slice(0, 30));
+      errCount++;
     }
 
-    function fmtSize(b) {
-        const k = 1024, s = ['B','KB','MB'];
-        const i = Math.floor(Math.log(b) / Math.log(k));
-        return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
-    }
+    // Update table and stats after every single image
+    renderQueue(liveQueue);
+    updateStats(liveQueue);
+    btn.textContent = `${doneCount + errCount} / ${selectedFiles.length} done`;
+  }
 
-    function removeFile(type) {
-        if (type === 'file') {
-            curFile = null;
-            document.getElementById('fileInput').value = '';
-            document.getElementById('filePreview').classList.remove('show');
-            document.getElementById('fileAnalyzeBtn').disabled = true;
-        } else {
-            curImg = null;
-            document.getElementById('imageInput').value = '';
-            document.getElementById('imagePreview').classList.remove('show');
-            document.getElementById('imageAnalyzeBtn').disabled = true;
-        }
-    }
+  isProcessing = false;
+  btn.disabled = false;
+  btn.textContent = 'Run Triage';
+  toast(
+    `✓ ${doneCount} analyzed${errCount ? ', ' + errCount + ' errors' : ''}`,
+    errCount ? 'error' : 'success'
+  );
+}
 
-    async function analyzeReport(type) {
-        const file = type === 'file' ? curFile : curImg;
-        document.getElementById('uploadSection').style.display = 'none';
-        document.getElementById('processing').classList.add('show');
+// ── Refresh from DB (for persisted history) ───────────────────
+async function refreshQueue() {
+  try {
+    const res  = await fetch(API + '/api/triage/queue');
+    const data = await res.json();
+    liveQueue  = data.queue || [];
+    renderQueue(liveQueue);
+    updateStats(liveQueue);
+  } catch {
+    toast('Cannot reach backend.', 'error');
+  }
+}
 
-        const steps = ['step1','step2','step3'];
-        steps.forEach((id, i) => {
-            setTimeout(() => {
-                if (i > 0) document.getElementById(steps[i-1]).className = 'proc-step done';
-                document.getElementById(id).className = 'proc-step active';
-            }, i * 900);
-        });
+// ── Stats bar ─────────────────────────────────────────────────
+function updateStats(queue) {
+  document.getElementById('stat-total').textContent = queue.length;
+  document.getElementById('stat-high').textContent  = queue.filter(r => r.priority === 'High').length;
+  document.getElementById('stat-med').textContent   = queue.filter(r => r.priority === 'Medium').length;
+  document.getElementById('stat-low').textContent   = queue.filter(r => r.priority === 'Low').length;
+}
 
-        try {
-            const fd = new FormData();
-            fd.append('report', file);
-            const endpoint = type === 'file' ? API.FILE : API.IMAGE;
-            const res = await fetch(API.BASE + endpoint, { method: 'POST', body: fd });
-            if (!res.ok) throw new Error('Server error (' + res.status + ')');
-            const data = await res.json();
-            if (typeof data.detected === 'undefined') throw new Error('Invalid response from server.');
-            setTimeout(() => {
-                document.getElementById('step3').className = 'proc-step done';
-                setTimeout(() => showResult(data, type), 350);
-            }, 2700);
-        } catch (err) {
-            document.getElementById('processing').classList.remove('show');
-            document.getElementById('uploadSection').style.display = 'grid';
-            let msg = 'Analysis failed. ';
-            if (err.message.includes('fetch')) msg += 'Cannot reach backend — make sure simple_backend.py is running on port 5000.';
-            else msg += err.message;
-            alert(msg);
-        }
-    }
+// ── Rendering helpers ─────────────────────────────────────────
+function priorityPill(p) {
+  if (!p || p === 'Pending') return `<span class="pill pill-pending">⏳ Pending</span>`;
+  if (p === 'High')   return `<span class="pill pill-high">🔴 High</span>`;
+  if (p === 'Medium') return `<span class="pill pill-medium">🟡 Medium</span>`;
+  return `<span class="pill pill-low">🟢 Low</span>`;
+}
 
-    function showResult(data, type) {
-        document.getElementById('processing').classList.remove('show');
-        const isPos = data.detected;
-        const conf  = data.confidence;
-        const name  = data.diseaseName || 'Unknown';
-        const model = type === 'image' ? 'EfficientNet-B0' : 'TF-IDF + Logistic Regression';
-        const cls   = isPos ? 'res-pos' : 'res-neg';
+function severityBar(score, priority) {
+  const w   = score != null ? score : 0;
+  const cls = priority === 'High' ? 'high' : priority === 'Medium' ? 'medium' : 'low';
+  return `
+    <div class="sev-bar-wrap">
+      <div class="sev-bar"><div class="sev-fill ${cls}" style="width:${w}%"></div></div>
+      <span style="font-size:.72rem;color:var(--text-dim);min-width:38px;text-align:right;">${score != null ? score.toFixed(1)+'%' : '—'}</span>
+    </div>`;
+}
 
-        const card = document.getElementById('resultCard');
-        card.className = cls + ' show';
+function renderQueue(queue) {
+  const wrap = document.getElementById('triage-table-wrap');
+  if (!queue.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>No analyses yet. Upload X-rays to populate the queue.</p></div>`;
+    return;
+  }
 
-        document.getElementById('resAvatar').textContent      = isPos ? '⚠️' : '✓';
-        document.getElementById('resStatusLabel').textContent = isPos ? 'Positive detection' : 'Negative detection';
-        document.getElementById('resTitle').textContent       = isPos ? name + ' detected' : 'No ' + name + ' detected';
-        document.getElementById('resMsg').textContent         = isPos
-            ? 'The model identified indicators consistent with ' + name + '. Please consult a qualified healthcare professional for a proper diagnosis.'
-            : 'No indicators of ' + name + ' were found in this report. Routine follow-up with a doctor is still advised.';
+  const rows = queue.map(r => {
+    const predClass = r.prediction === 'PNEUMONIA' ? 'pneumonia' : 'normal';
+    return `<tr>
+      <td style="color:var(--text-dim);font-family:var(--mono);font-size:.72rem;">${r.id}</td>
+      <td class="td-filename" title="${r.filename}">${r.filename}</td>
+      <td class="td-pred ${predClass}">${r.prediction || '—'}</td>
+      <td style="font-family:var(--mono);">${r.confidence != null ? r.confidence.toFixed(1)+'%' : '—'}</td>
+      <td>${severityBar(r.severity_score, r.priority)}</td>
+      <td>${priorityPill(r.priority)}</td>
+      <td style="font-size:.72rem;color:var(--text-dim);font-family:var(--mono);">${(r.timestamp||'').slice(0,19).replace('T',' ') || '—'}</td>
+    </tr>`;
+  }).join('');
 
-        document.getElementById('mConf').textContent   = conf + '%';
-        document.getElementById('mResult').textContent = isPos ? 'Positive' : 'Negative';
-        document.getElementById('mResult').className   = 'res-metric-value ' + (isPos ? 'v-red' : 'v-green');
-        document.getElementById('mModel').textContent  = model;
-        document.getElementById('confPct').textContent = conf + '%';
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Filename</th><th>Prediction</th>
+          <th>Confidence</th><th class="sort-active">Severity ▾</th>
+          <th>Priority</th><th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
 
-        setTimeout(() => { document.getElementById('confFill').style.width = conf + '%'; }, 80);
-        document.getElementById('resMeta').textContent = 'Completed · ' + new Date().toLocaleString();
-
-        // Reasoning — parse markdown-style text from backend
-        const rc = document.getElementById('reasoningContent');
-        const reasoningText = data.reasoning || data.reasoning_text || data.reason || null;
-        if (reasoningText && typeof reasoningText === 'string' && reasoningText.trim().length > 0) {
-            rc.innerHTML = parseReasoning(reasoningText);
-        } else {
-            rc.innerHTML = '<p style="font-size:12px;color:var(--text3);">Reasoning not available.</p>';
-        }
-    }
-
-    /**
-     * Converts the Claude API markdown response into styled HTML.
-     * Handles **Heading** sections and - bullet points.
-     */
-    function parseReasoning(text) {
-        const sections = text.split(/\n(?=\*\*)/);
-        let html = '<div class="reasoning-text">';
-
-        sections.forEach(section => {
-            section = section.trim();
-            if (!section) return;
-
-            // Extract heading if line starts with **...**
-            const headingMatch = section.match(/^\*\*(.+?)\*\*/);
-            const heading = headingMatch ? headingMatch[1] : null;
-            const body    = heading ? section.replace(/^\*\*(.+?)\*\*\n?/, '').trim() : section;
-
-            html += '<div class="rt-section">';
-            if (heading) {
-                html += `<div class="rt-heading">${heading}</div>`;
-            }
-
-            // Split body into bullets or paragraph
-            const lines = body.split('\n').filter(l => l.trim());
-            const hasBullets = lines.some(l => l.trim().startsWith('-') || l.trim().startsWith('•'));
-
-            if (hasBullets) {
-                html += '<div class="rt-bullets">';
-                lines.forEach(line => {
-                    const content = line.replace(/^[-•]\s*/, '').trim();
-                    if (content) {
-                        const clean = content.replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text);font-weight:600;">$1</strong>');
-                        html += `<div class="rt-bullet"><div class="rt-bullet-dot"></div><span>${clean}</span></div>`;
-                    }
-                });
-                html += '</div>';
-            } else {
-                const para = lines.join(' ').trim();
-                if (para) html += `<div class="rt-body">${para}</div>`;
-            }
-
-            html += '</div>';
-        });
-
-        html += '</div>';
-        return html;
-    }
-
-    function resetAnalysis() {
-        curFile = null; curImg = null;
-        document.getElementById('fileInput').value = '';
-        document.getElementById('imageInput').value = '';
-        document.getElementById('filePreview').classList.remove('show');
-        document.getElementById('imagePreview').classList.remove('show');
-        document.getElementById('fileAnalyzeBtn').disabled = true;
-        document.getElementById('imageAnalyzeBtn').disabled = true;
-        const card = document.getElementById('resultCard');
-        card.className = ''; card.style.display = '';
-        document.getElementById('processing').classList.remove('show');
-        document.getElementById('uploadSection').style.display = 'grid';
-        ['step1','step2','step3'].forEach(id => document.getElementById(id).className = 'proc-step');
-        document.getElementById('step1').className = 'proc-step active';
-        document.getElementById('confFill').style.width = '0%';
-        document.getElementById('reasoningContent').innerHTML = '';
-    }
+// ── Clear ─────────────────────────────────────────────────────
+async function clearTriage() {
+  if (!confirm('Clear the entire triage queue from the database?')) return;
+  try {
+    await fetch(API + '/api/triage/clear', { method: 'DELETE' });
+    selectedFiles = []; liveQueue = [];
+    document.getElementById('file-bulk').value = '';
+    document.getElementById('upload-list').innerHTML = '';
+    document.getElementById('bulk-file-count').textContent = 'No files selected';
+    document.getElementById('bulk-submit-btn').disabled = true;
+    renderQueue([]); updateStats([]);
+    toast('Queue cleared.', 'success');
+  } catch {
+    toast('Clear failed.', 'error');
+  }
+}
 </script>
 </body>
 </html>

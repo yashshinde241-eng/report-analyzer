@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__sequentialthinking__sequentialthinking",
+      "mcp__sqlite__execute_query",
+      "mcp__sqlite__list_tables"
+    ]
+  }
+}
