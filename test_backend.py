@@ -1,220 +1,264 @@
 """
-Test Script for Medical Report Analyzer
-========================================
-This script tests your backend API to ensure it's working correctly.
+test_backend.py — Report Analyzer API Integration Tests
+=========================================================
+Tests the live Flask backend endpoints.  Run this script *after* starting
+the server:
+
+    python simple_backend.py
 
 Usage:
-    python test_backend.py
-
-Make sure your backend is running before testing!
+    python test_backend.py [--url http://localhost:5000]
 """
 
-import requests
+import argparse
+import io
 import json
-from pathlib import Path
+import sys
 
-# Configuration - Change this to match your backend
-BACKEND_URL = "http://localhost:5000"  # or http://localhost:8000 for FastAPI
+import requests
+from PIL import Image
 
-def test_health_check():
-    """Test if the backend is running"""
-    print("\n" + "="*60)
-    print("TEST 1: Health Check")
-    print("="*60)
-    
+# ── CLI argument for flexible target URL ─────────────────────────────────────
+parser = argparse.ArgumentParser(description="Report Analyzer backend tests")
+parser.add_argument(
+    "--url",
+    default="http://localhost:5000",
+    help="Base URL of the running backend (default: http://localhost:5000)",
+)
+args, _ = parser.parse_known_args()
+BACKEND_URL = args.url.rstrip("/")
+
+PASS  = "✅ PASS"
+FAIL  = "❌ FAIL"
+SKIP  = "⚠️  SKIP"
+SEP   = "=" * 60
+
+
+def _section(title: str) -> None:
+    print(f"\n{SEP}\n{title}\n{SEP}")
+
+
+def _result(label: str, ok: bool | None, detail: str = "") -> bool | None:
+    icon = PASS if ok is True else (SKIP if ok is None else FAIL)
+    print(f"{icon} {label}")
+    if detail:
+        print(f"    {detail}")
+    return ok
+
+
+# ── Test 1: Health Check ──────────────────────────────────────────────────────
+
+def test_health_check() -> bool:
+    _section("TEST 1: Health Check — GET /api/health")
     try:
-        response = requests.get(f"{BACKEND_URL}/api/health")
-        print(f"✅ Status Code: {response.status_code}")
-        print(f"✅ Response: {json.dumps(response.json(), indent=2)}")
-        return True
+        resp = requests.get(f"{BACKEND_URL}/api/health", timeout=5)
+        ok   = resp.status_code == 200
+        data = resp.json()
+        _result("HTTP 200 OK", ok)
+        _result("status == 'ok'",  data.get("status") == "ok",
+                f"status={data.get('status')}")
+        _result("'device' key present",    "device"            in data)
+        _result("'groq_configured' key",   "groq_configured"   in data)
+        _result("'model_checkpoint' key",  "model_checkpoint"  in data,
+                f"checkpoint found = {data.get('model_checkpoint')}")
+        return ok
     except requests.exceptions.ConnectionError:
-        print("❌ ERROR: Cannot connect to backend!")
-        print(f"   Make sure the server is running at {BACKEND_URL}")
+        _result("Connection", False,
+                f"Cannot reach backend at {BACKEND_URL}. Is it running?")
         return False
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
+    except Exception as exc:
+        _result("Unexpected error", False, str(exc))
         return False
 
 
-def test_file_upload():
-    """Test file upload endpoint"""
-    print("\n" + "="*60)
-    print("TEST 2: File Upload (with dummy file)")
-    print("="*60)
-    
-    # Create a dummy text file for testing
-    dummy_content = """
-    Medical Report
-    ==============
-    Patient: Test Patient
-    Date: 2024-01-01
-    
-    Test results indicate normal levels.
-    No abnormalities detected.
-    """
-    
+# ── Test 2: Single Image Analysis ─────────────────────────────────────────────
+
+def test_single_image_analysis() -> bool:
+    _section("TEST 2: Single Image — POST /api/analyze/image  (field: 'file')")
     try:
-        # Create temporary file
-        files = {
-            'report': ('test_report.txt', dummy_content, 'text/plain')
-        }
-        
-        response = requests.post(
-            f"{BACKEND_URL}/api/analyze/file",
-            files=files
-        )
-        
-        print(f"✅ Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            result = response.json()
-            print(f"✅ Response:")
-            print(f"   - Detected: {result.get('detected')}")
-            print(f"   - Confidence: {result.get('confidence')}%")
-            print(f"   - Disease: {result.get('diseaseName')}")
-            print(f"   - Type: {result.get('reportType')}")
-            return True
-        else:
-            print(f"❌ Error Response: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
-        return False
+        # Build a minimal valid RGB PNG in memory
+        buf = io.BytesIO()
+        Image.new("RGB", (224, 224), color=(128, 128, 128)).save(buf, format="PNG")
+        buf.seek(0)
 
-
-def test_image_upload():
-    """Test image upload endpoint"""
-    print("\n" + "="*60)
-    print("TEST 3: Image Upload (with dummy image)")
-    print("="*60)
-    
-    try:
-        from PIL import Image
-        import io
-        
-        # Create a dummy image for testing
-        img = Image.new('RGB', (100, 100), color='red')
-        img_bytes = io.BytesIO()
-        img.save(img_bytes, format='PNG')
-        img_bytes.seek(0)
-        
-        files = {
-            'report': ('test_image.png', img_bytes, 'image/png')
-        }
-        
-        response = requests.post(
+        resp = requests.post(
             f"{BACKEND_URL}/api/analyze/image",
-            files=files
+            files={"file": ("test_xray.png", buf, "image/png")},
+            timeout=30,
         )
-        
-        print(f"✅ Status Code: {response.status_code}")
-        
-        if response.status_code == 200:
-            result = response.json()
-            print(f"✅ Response:")
-            print(f"   - Detected: {result.get('detected')}")
-            print(f"   - Confidence: {result.get('confidence')}%")
-            print(f"   - Disease: {result.get('diseaseName')}")
-            print(f"   - Type: {result.get('reportType')}")
-            return True
-        else:
-            print(f"❌ Error Response: {response.text}")
-            return False
-            
-    except ImportError:
-        print("⚠️  Skipping: PIL not installed (run: pip install pillow)")
-        return None
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
+        data = resp.json()
+        ok   = resp.status_code == 200
+        _result("HTTP 200 OK", ok, f"status={resp.status_code}")
+        _result("'prediction' in response",     "prediction"    in data)
+        _result("'confidence' in response",     "confidence"    in data)
+        _result("'severity_score' in response", "severity_score" in data)
+        _result("'detected' in response",       "detected"       in data)
+        _result("'disease' == 'Pneumonia'",
+                data.get("disease") == "Pneumonia", f"disease={data.get('disease')}")
+        # Validate 0–100 scale
+        conf = data.get("confidence")
+        sev  = data.get("severity_score")
+        _result("confidence in [0,100]",
+                conf is not None and 0.0 <= conf <= 100.0,
+                f"confidence={conf}")
+        _result("severity_score in [0,100]",
+                sev is not None  and 0.0 <= sev  <= 100.0,
+                f"severity_score={sev}")
+        return ok
+    except Exception as exc:
+        _result("Unexpected error", False, str(exc))
         return False
 
 
-def test_invalid_file():
-    """Test error handling with invalid file"""
-    print("\n" + "="*60)
-    print("TEST 4: Invalid File Handling")
-    print("="*60)
-    
+# ── Test 3: Triage Analyze-One ────────────────────────────────────────────────
+
+def test_triage_analyze_one() -> bool:
+    _section("TEST 3: Triage Single — POST /api/triage/analyze-one")
     try:
-        # Try to upload a file with invalid extension
-        files = {
-            'report': ('test.xyz', b'invalid content', 'application/octet-stream')
-        }
-        
-        response = requests.post(
-            f"{BACKEND_URL}/api/analyze/file",
-            files=files
+        buf = io.BytesIO()
+        Image.new("RGB", (224, 224), color=(60, 60, 60)).save(buf, format="JPEG")
+        buf.seek(0)
+
+        resp = requests.post(
+            f"{BACKEND_URL}/api/triage/analyze-one",
+            files={"file": ("patient_001.jpg", buf, "image/jpeg")},
+            timeout=30,
         )
-        
-        print(f"✅ Status Code: {response.status_code}")
-        
-        if response.status_code == 400:
-            print(f"✅ Correctly rejected invalid file")
-            print(f"   Error message: {response.json().get('error')}")
-            return True
-        else:
-            print(f"⚠️  Expected 400 status code, got {response.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
+        data = resp.json()
+        ok   = resp.status_code == 200
+        _result("HTTP 200 OK", ok, f"status={resp.status_code}")
+        _result("'id' in response",           "id"             in data)
+        _result("'priority' in response",     "priority"       in data,
+                f"priority={data.get('priority')}")
+        _result("status == 'Analyzed'",
+                data.get("status") == "Analyzed", f"status={data.get('status')}")
+        sev = data.get("severity_score")
+        _result("severity_score in [0,100]",
+                sev is not None and 0.0 <= sev <= 100.0, f"severity_score={sev}")
+        valid_priorities = {"High", "Medium", "Low"}
+        _result("priority is valid label",
+                data.get("priority") in valid_priorities,
+                f"priority={data.get('priority')}")
+        return ok
+    except Exception as exc:
+        _result("Unexpected error", False, str(exc))
         return False
 
 
-def run_all_tests():
-    """Run all tests and report results"""
-    print("\n" + "="*60)
-    print("MEDICAL REPORT ANALYZER - BACKEND TESTS")
-    print("="*60)
-    print(f"Testing backend at: {BACKEND_URL}")
-    
-    results = {
-        'Health Check': test_health_check(),
-        'File Upload': test_file_upload(),
-        'Image Upload': test_image_upload(),
-        'Invalid File Handling': test_invalid_file()
-    }
-    
-    # Summary
-    print("\n" + "="*60)
-    print("TEST SUMMARY")
-    print("="*60)
-    
-    passed = sum(1 for v in results.values() if v is True)
-    skipped = sum(1 for v in results.values() if v is None)
-    failed = sum(1 for v in results.values() if v is False)
-    
-    for test_name, result in results.items():
-        if result is True:
-            status = "✅ PASSED"
-        elif result is None:
-            status = "⚠️  SKIPPED"
+# ── Test 4: Triage Queue ──────────────────────────────────────────────────────
+
+def test_triage_queue() -> bool:
+    _section("TEST 4: Triage Queue — GET /api/triage/queue")
+    try:
+        resp = requests.get(f"{BACKEND_URL}/api/triage/queue", timeout=10)
+        data = resp.json()
+        ok   = resp.status_code == 200
+        _result("HTTP 200 OK", ok, f"status={resp.status_code}")
+        _result("'total' in response",  "total" in data)
+        _result("'queue' is a list",    isinstance(data.get("queue"), list))
+
+        queue = data.get("queue", [])
+        if queue:
+            first = queue[0]
+            _result("Queue item has 'severity_score'",
+                    "severity_score" in first)
+            _result("Queue item has 'priority'",
+                    "priority" in first)
+            # Verify descending severity order
+            sevs = [r["severity_score"] for r in queue
+                    if r["severity_score"] is not None]
+            ordered = sevs == sorted(sevs, reverse=True)
+            _result("Queue sorted by severity DESC", ordered,
+                    f"scores={sevs[:5]}{'...' if len(sevs)>5 else ''}")
         else:
-            status = "❌ FAILED"
-        print(f"{status} - {test_name}")
-    
+            _result("Queue ordering (skipped — empty queue)", None)
+        return ok
+    except Exception as exc:
+        _result("Unexpected error", False, str(exc))
+        return False
+
+
+# ── Test 5: MIME Validation ───────────────────────────────────────────────────
+
+def test_mime_validation() -> bool:
+    _section("TEST 5: Input Validation — reject non-image uploads")
+    try:
+        # Send a text file disguised as an upload
+        resp = requests.post(
+            f"{BACKEND_URL}/api/analyze/image",
+            files={"file": ("report.txt", b"this is not an image", "text/plain")},
+            timeout=10,
+        )
+        ok = resp.status_code == 400
+        _result("HTTP 400 for .txt file", ok,
+                f"status={resp.status_code}")
+        data = resp.json()
+        _result("Error message present", bool(data.get("error")),
+                f"error={data.get('error')}")
+        return ok
+    except Exception as exc:
+        _result("Unexpected error", False, str(exc))
+        return False
+
+
+# ── Test 6: Triage Clear ──────────────────────────────────────────────────────
+
+def test_triage_clear() -> bool:
+    _section("TEST 6: Triage Clear — DELETE /api/triage/clear")
+    try:
+        resp = requests.delete(f"{BACKEND_URL}/api/triage/clear", timeout=10)
+        ok   = resp.status_code == 200
+        _result("HTTP 200 OK", ok, f"status={resp.status_code}")
+        data = resp.json()
+        _result("'message' in response", "message" in data,
+                f"message={data.get('message')}")
+        return ok
+    except Exception as exc:
+        _result("Unexpected error", False, str(exc))
+        return False
+
+
+# ── Runner ────────────────────────────────────────────────────────────────────
+
+def run_all_tests() -> None:
+    print(f"\n{SEP}")
+    print("REPORT ANALYZER — BACKEND INTEGRATION TESTS")
+    print(f"Target: {BACKEND_URL}")
+    print(SEP)
+
+    # Health check gates all other tests
+    if not test_health_check():
+        print(f"\n{SEP}")
+        print("ABORTED — backend unreachable. Start simple_backend.py first.")
+        print(SEP)
+        sys.exit(1)
+
+    results = {
+        "Health Check":        True,  # already passed above
+        "Single Image":        test_single_image_analysis(),
+        "Triage Analyze-One":  test_triage_analyze_one(),
+        "Triage Queue":        test_triage_queue(),
+        "MIME Validation":     test_mime_validation(),
+        "Triage Clear":        test_triage_clear(),
+    }
+
+    _section("SUMMARY")
+    passed  = sum(1 for v in results.values() if v is True)
+    skipped = sum(1 for v in results.values() if v is None)
+    failed  = sum(1 for v in results.values() if v is False)
+
+    for name, res in results.items():
+        icon = PASS if res is True else (SKIP if res is None else FAIL)
+        print(f"{icon}  {name}")
+
     print(f"\nTotal: {passed} passed, {failed} failed, {skipped} skipped")
-    
-    if failed == 0 and passed > 0:
-        print("\n🎉 All tests passed! Your backend is ready to use.")
-        print("\nNext steps:")
-        print("1. Open report-analyzer.html in your browser")
-        print("2. Upload a real medical report file or image")
-        print("3. Integrate your actual ML models")
-    elif failed > 0:
-        print("\n⚠️  Some tests failed. Please check the errors above.")
-    
-    print("="*60)
+
+    if failed == 0:
+        print("\n🎉 All tests passed. Backend is healthy and ready.")
+    else:
+        print("\n⚠️  Some tests failed — review output above.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    # Check if required libraries are installed
-    try:
-        import requests
-    except ImportError:
-        print("❌ ERROR: 'requests' library not installed")
-        print("   Run: pip install requests")
-        exit(1)
-    
     run_all_tests()

@@ -1,16 +1,43 @@
-# Requirements for Medical Report Analyzer Backend
+# ── Report Analyzer — Python Dependencies ────────────────────────────────────
+# Install with:  pip install -r requirements.txt
+#
+# All packages are uncommented and pinned.  Tested on Python 3.10+.
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Core Flask Backend (Option 1)
+# ── Web Framework ─────────────────────────────────────────────────────────────
 flask==3.0.0
 flask-cors==4.0.0
+werkzeug==3.0.1
 
-# Core FastAPI Backend (Option 2)
+# ── HTTP client (Groq API + federated node communication) ────────────────────
+requests==2.31.0
+
+# ── Environment variable loading ─────────────────────────────────────────────
+python-dotenv==1.0.0
+
+# ── Image processing ─────────────────────────────────────────────────────────
+pillow==10.1.0
+
+# ── Machine Learning — PyTorch stack ─────────────────────────────────────────
+# GPU: install the appropriate CUDA wheel from https://pytorch.org
+# CPU-only (default pip install):
+torch==2.1.2
+torchvision==0.16.2
+numpy==1.26.2
+
+# ── Robust augmentation & preprocessing (Phase 1.5) ─────────────────────────
+albumentations==2.0.8
+opencv-python-headless==4.13.0.92
+
+# Requirements for Medical Report Analyzer Backend
+
+
+# Core FastAPI Backend
 fastapi==0.108.0
 uvicorn[standard]==0.25.0
 python-multipart==0.0.6
 
 # File Processing Libraries
-pillow==10.1.0          # Image processing
 PyPDF2==3.0.1           # PDF text extraction
 python-docx==1.1.0      # Word document processing
 
