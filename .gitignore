@@ -3,6 +3,7 @@ models/
 
 # Dataset (too large for GitHub)
 data set/
+data/
 
 # Python cache
 __pycache__/
