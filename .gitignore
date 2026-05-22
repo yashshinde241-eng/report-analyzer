@@ -5,6 +5,20 @@ models/
 data set/
 data/
 
+# Database files
+*.db
+
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.bmp
+
+# Trained model artifacts
+*.pth
+*.pkl
+*.pt
+
 # Python cache
 __pycache__/
 *.pyc
