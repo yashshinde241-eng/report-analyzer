@@ -261,7 +261,14 @@ def generate_gradcam(image_bytes: bytes) -> str:
     def backward_hook(module, grad_input, grad_output):
         gradients.append(grad_output[0].detach())
 
-    target_layer = model.features[-1]
+    # Target the last Conv2d inside features[-1] for reliable hook firing
+    target_layer = None
+    for m in model.features[-1].modules():
+        if isinstance(m, nn.Conv2d):
+            target_layer = m
+    if target_layer is None:
+        target_layer = model.features[-1]
+
     fh = target_layer.register_forward_hook(forward_hook)
     bh = target_layer.register_full_backward_hook(backward_hook)
 
@@ -275,20 +282,16 @@ def generate_gradcam(image_bytes: bytes) -> str:
         ])
         tensor = tfm(image=rgb_array)["image"].unsqueeze(0).to(device)  # (1,3,224,224)
 
-        # Need grad on input to allow backward through BatchNorm in eval mode
-        tensor = tensor.requires_grad_(True)
+        with torch.enable_grad():
+            model.eval()
+            logits = model(tensor)                          # (1, 2)
+            pred_class = logits.argmax(dim=1).item()
+            score = logits[0, pred_class]
+            model.zero_grad()
+            score.backward()
 
-        # Set only the feature extractor to train mode so BatchNorm1d
-        # in the classifier (batch_size=1) doesn't crash.
-        # features needs train mode for gradient flow through BatchNorm2d.
-        model.features.train()
-        model.classifier.eval()
-        logits = model(tensor)                          # (1, 2)
-        pred_class = logits.argmax(dim=1).item()
-        score = logits[0, pred_class]
-        model.zero_grad()
-        score.backward()
-        model.eval()
+        if not gradients or not activations:
+            raise RuntimeError("Grad-CAM hooks did not fire — no gradients captured.")
 
         grads = gradients[0]       # (1, C, H, W)
         acts  = activations[0]     # (1, C, H, W)
