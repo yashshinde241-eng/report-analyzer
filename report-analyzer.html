@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Report Analyzer — Smart Triage</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 /* ── Reset & Variables ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,6 +28,9 @@
   --yellow-dim:  rgba(245,197,24,.13);
   --green:       #3dffa0;
   --green-dim:   rgba(61,255,160,.12);
+  --cyan:        #00d4ff;
+  --cyan-dim:    rgba(0,212,255,.12);
+  --cyan-glow:   rgba(0,212,255,.22);
   --mono:        'JetBrains Mono', monospace;
   --sans:        'Space Grotesk', sans-serif;
   --radius:      12px;
@@ -43,7 +47,6 @@ body {
   overflow-x: hidden;
 }
 
-/* ── Background grid ───────────────────────────────────────────── */
 body::before {
   content: '';
   position: fixed; inset: 0; z-index: 0;
@@ -54,8 +57,7 @@ body::before {
   pointer-events: none;
 }
 
-/* ── Layout ────────────────────────────────────────────────────── */
-.wrapper { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; position: relative; z-index: 1; }
+.wrapper { max-width: 1160px; margin: 0 auto; padding: 0 24px 80px; position: relative; z-index: 1; }
 
 /* ── Header ────────────────────────────────────────────────────── */
 .header {
@@ -87,10 +89,8 @@ body::before {
   cursor: pointer; transition: all .2s;
   background: transparent; color: var(--text-dim);
 }
-.mode-btn.active {
-  background: var(--purple); color: #fff;
-  box-shadow: 0 0 14px var(--purple-glow);
-}
+.mode-btn.active { background: var(--purple); color: #fff; box-shadow: 0 0 14px var(--purple-glow); }
+.mode-btn.active-cyan { background: var(--cyan); color: #000; box-shadow: 0 0 14px var(--cyan-glow); }
 
 /* ── Section titles ────────────────────────────────────────────── */
 .section-title {
@@ -98,8 +98,9 @@ body::before {
   text-transform: uppercase; color: var(--purple);
   margin-bottom: 16px;
 }
+.section-title-cyan { color: var(--cyan); }
 
-/* ── Cards / Glass ─────────────────────────────────────────────── */
+/* ── Cards ─────────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -109,86 +110,59 @@ body::before {
   transition: border-color .2s;
 }
 .card:hover { border-color: rgba(155,89,245,.3); }
+.card-cyan:hover { border-color: rgba(0,212,255,.3); }
 
-/* ── Original analysis panel ───────────────────────────────────── */
-#panel-single { display: block; }
-#panel-triage { display: none; }
-
-/* ── Upload zone ───────────────────────────────────────────────── */
+/* ── Upload zone ────────────────────────────────────────────────── */
 .upload-zone {
   border: 2px dashed rgba(155,89,245,.35);
-  border-radius: var(--radius);
-  padding: 40px 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: all .2s;
+  border-radius: var(--radius); padding: 40px 20px;
+  text-align: center; cursor: pointer; transition: all .2s;
   position: relative;
 }
 .upload-zone:hover, .upload-zone.drag-over {
-  border-color: var(--purple);
-  background: rgba(155,89,245,.06);
+  border-color: var(--purple); background: rgba(155,89,245,.06);
 }
-.upload-zone input[type="file"] {
-  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-}
+.upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; pointer-events: none; }
 .upload-icon { font-size: 2.5rem; margin-bottom: 12px; }
 .upload-zone p { color: var(--text-dim); font-size: .875rem; line-height: 1.6; }
 .upload-zone p strong { color: var(--text); }
 
-/* ── Buttons ───────────────────────────────────────────────────── */
+/* ── Buttons ─────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 22px; border-radius: 8px; border: none;
   font-family: var(--sans); font-size: .875rem; font-weight: 600;
   cursor: pointer; transition: all .2s;
 }
-.btn-primary {
-  background: var(--purple); color: #fff;
-  box-shadow: 0 0 16px var(--purple-glow);
-}
+.btn-primary { background: var(--purple); color: #fff; box-shadow: 0 0 16px var(--purple-glow); }
 .btn-primary:hover { background: #b070ff; box-shadow: 0 0 24px var(--purple-glow); }
 .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
-.btn-ghost {
-  background: transparent; color: var(--text-dim);
-  border: 1px solid var(--border);
-}
+.btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
 .btn-ghost:hover { color: var(--text); border-color: rgba(255,255,255,.2); }
-
-/* ── Result box ────────────────────────────────────────────────── */
-.result-box {
-  margin-top: 20px; display: none;
-  animation: fadeUp .35s ease both;
+.btn-cyan {
+  background: var(--cyan); color: #000;
+  box-shadow: 0 0 20px var(--cyan-glow), 0 0 40px rgba(0,212,255,.1);
+  font-size: .9rem; padding: 12px 28px; border-radius: 10px;
 }
+.btn-cyan:hover { background: #33ddff; box-shadow: 0 0 30px var(--cyan-glow), 0 0 60px rgba(0,212,255,.15); }
+.btn-cyan:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── Result box ─────────────────────────────────────────────────── */
+.result-box { margin-top: 20px; display: none; animation: fadeUp .35s ease both; }
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.result-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
-}
-.badge {
-  padding: 4px 14px; border-radius: 30px;
-  font-size: .75rem; font-weight: 700; letter-spacing: .06em;
-  text-transform: uppercase;
-}
+.result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+.badge { padding: 4px 14px; border-radius: 30px; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .badge-detected   { background: var(--red-dim);    color: var(--red);   border: 1px solid rgba(255,77,109,.3); }
 .badge-normal     { background: var(--green-dim);  color: var(--green); border: 1px solid rgba(61,255,160,.25); }
-.badge-pending    { background: var(--yellow-dim); color: var(--yellow);border: 1px solid rgba(245,197,24,.25); }
+.badge-privacy    { background: var(--cyan-dim);   color: var(--cyan);  border: 1px solid rgba(0,212,255,.25); font-size:.65rem; }
 
 .confidence-bar-wrap { margin: 12px 0; }
-.confidence-label {
-  display: flex; justify-content: space-between;
-  font-size: .75rem; color: var(--text-dim); margin-bottom: 6px;
-}
-.confidence-bar {
-  height: 6px; border-radius: 4px; background: var(--border); overflow: hidden;
-}
-.confidence-fill {
-  height: 100%; border-radius: 4px;
-  background: linear-gradient(90deg, var(--purple-dim), var(--purple));
-  transition: width .6s ease;
-}
+.confidence-label { display: flex; justify-content: space-between; font-size: .75rem; color: var(--text-dim); margin-bottom: 6px; }
+.confidence-bar { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.confidence-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--purple-dim), var(--purple)); transition: width .6s ease; }
 
 .reasoning-box {
   background: var(--bg3); border: 1px solid var(--border);
@@ -198,15 +172,9 @@ body::before {
   max-height: 320px; overflow-y: auto;
 }
 
-/* ── Triage dashboard ──────────────────────────────────────────── */
+/* ── Triage panel ────────────────────────────────────────────────── */
 .triage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
-@media (max-width: 640px) { .triage-grid { grid-template-columns: 1fr; } }
-
-.stat-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 20px;
-  text-align: center;
-}
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
 .stat-value { font-size: 2rem; font-weight: 700; letter-spacing: -.03em; }
 .stat-label { font-size: .72rem; color: var(--text-dim); letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
 .stat-red    .stat-value { color: var(--red); }
@@ -214,44 +182,18 @@ body::before {
 .stat-green  .stat-value { color: var(--green); }
 .stat-purple .stat-value { color: var(--purple); }
 
-/* Progress ring */
-.progress-ring-wrap { display: flex; align-items: center; gap: 16px; margin: 8px 0 20px; }
-.progress-label { font-size: .8rem; color: var(--text-dim); }
-
-/* Upload progress item */
 .upload-list { list-style: none; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
-.upload-item {
-  display: flex; align-items: center; justify-content: space-between;
-  background: var(--bg3); border-radius: 8px; padding: 8px 14px;
-  font-size: .8rem; animation: fadeUp .25s ease both;
-}
+.upload-item { display: flex; align-items: center; justify-content: space-between; background: var(--bg3); border-radius: 8px; padding: 8px 14px; font-size: .8rem; animation: fadeUp .25s ease both; }
 .upload-item .file-name { color: var(--text-dim); font-family: var(--mono); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .upload-item .file-status { display: flex; align-items: center; gap: 6px; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--purple); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Priority table ────────────────────────────────────────────── */
-.triage-table-wrap {
-  overflow-x: auto; border-radius: var(--radius);
-  border: 1px solid var(--border);
-}
-table {
-  width: 100%; border-collapse: collapse;
-  font-size: .82rem;
-}
-thead th {
-  background: var(--bg3);
-  padding: 12px 16px; text-align: left;
-  font-size: .7rem; font-weight: 600; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--text-dim);
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
+.triage-table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+thead th { background: var(--bg3); padding: 12px 16px; text-align: left; font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); white-space: nowrap; }
 thead th.sort-active { color: var(--purple); }
-tbody tr {
-  border-bottom: 1px solid var(--border);
-  transition: background .15s;
-}
+tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--surface-h); }
 tbody td { padding: 11px 16px; vertical-align: middle; }
@@ -259,20 +201,13 @@ tbody td { padding: 11px 16px; vertical-align: middle; }
 .td-pred { font-weight: 600; }
 .td-pred.pneumonia { color: var(--red); }
 .td-pred.normal    { color: var(--green); }
-.td-score { font-family: var(--mono); font-weight: 600; }
 
-/* Priority pill */
-.pill {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 10px; border-radius: 20px;
-  font-size: .7rem; font-weight: 700; letter-spacing: .05em;
-}
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: .7rem; font-weight: 700; letter-spacing: .05em; }
 .pill-high   { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(255,77,109,.3); }
 .pill-medium { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,197,24,.25); }
 .pill-low    { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(61,255,160,.2); }
 .pill-pending{ background: var(--surface);    color: var(--text-dim); border: 1px solid var(--border); }
 
-/* Severity bar in table */
 .sev-bar-wrap { display: flex; align-items: center; gap: 8px; }
 .sev-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; min-width: 60px; }
 .sev-fill { height: 100%; border-radius: 3px; transition: width .5s ease; }
@@ -280,33 +215,195 @@ tbody td { padding: 11px 16px; vertical-align: middle; }
 .sev-fill.medium { background: var(--yellow); }
 .sev-fill.low    { background: var(--green); }
 
-/* Empty state */
-.empty-state {
-  text-align: center; padding: 60px 20px; color: var(--text-dim);
-}
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
 .empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: .4; }
 .empty-state p { font-size: .875rem; }
 
-/* ── Toast ─────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   FEDERATED CONTROL TOWER
+══════════════════════════════════════════════════════════════ */
+#panel-fl { display: none; }
+
+/* Node monitor grid */
+.node-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-bottom: 24px;
+}
+@media (max-width: 700px) { .node-grid { grid-template-columns: 1fr; } }
+
+.node-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  transition: border-color .3s, box-shadow .3s;
+  position: relative; overflow: hidden;
+}
+.node-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  opacity: 0; transition: opacity .4s;
+}
+.node-card.training { border-color: rgba(0,212,255,.45); box-shadow: 0 0 24px rgba(0,212,255,.12); }
+.node-card.training::before { opacity: 1; }
+.node-card.offline { border-color: rgba(255,77,109,.3); opacity: .7; }
+
+.node-title { font-size: .85rem; font-weight: 600; letter-spacing: .04em; }
+.node-port  { font-size: .68rem; color: var(--text-dim); font-family: var(--mono); }
+
+/* Status badge */
+.node-badge {
+  padding: 3px 12px; border-radius: 20px;
+  font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  transition: all .3s;
+}
+.node-badge.idle     { background: var(--surface-h); color: var(--text-dim); border: 1px solid var(--border); }
+.node-badge.training { background: var(--cyan-dim);  color: var(--cyan);    border: 1px solid rgba(0,212,255,.35); }
+.node-badge.offline  { background: var(--red-dim);   color: var(--red);     border: 1px solid rgba(255,77,109,.3); }
+.node-badge.error    { background: var(--red-dim);   color: var(--red);     border: 1px solid rgba(255,77,109,.3); }
+
+/* Progress ring */
+.ring-wrap { position: relative; width: 80px; height: 80px; }
+.ring-wrap svg { transform: rotate(-90deg); }
+.ring-track { fill: none; stroke: rgba(255,255,255,.06); stroke-width: 5; }
+.ring-fill  {
+  fill: none; stroke: var(--cyan); stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  transition: stroke-dashoffset .6s ease;
+}
+.ring-fill.spinning {
+  animation: ringPulse 1.4s ease-in-out infinite;
+}
+@keyframes ringPulse {
+  0%   { stroke-dashoffset: 220; }
+  50%  { stroke-dashoffset: 55;  }
+  100% { stroke-dashoffset: 220; }
+}
+.ring-center {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem;
+}
+
+/* FL control row */
+.fl-control-row {
+  display: flex; align-items: center; gap: 16px;
+  flex-wrap: wrap; margin-bottom: 24px;
+}
+.rounds-input {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px;
+  font-family: var(--mono); font-size: .85rem; color: var(--text);
+  width: 80px; text-align: center;
+  outline: none; transition: border-color .2s;
+}
+.rounds-input:focus { border-color: var(--cyan); }
+.rounds-label { font-size: .8rem; color: var(--text-dim); }
+
+/* FL dashboard lower row */
+.fl-lower-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 800px) { .fl-lower-grid { grid-template-columns: 1fr; } }
+
+/* HUD Terminal */
+.terminal {
+  background: #080810;
+  border: 1px solid rgba(0,212,255,.2);
+  border-radius: var(--radius);
+  padding: 0;
+  height: 320px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  font-family: var(--mono);
+}
+.terminal-header {
+  background: rgba(0,212,255,.07);
+  border-bottom: 1px solid rgba(0,212,255,.15);
+  padding: 8px 16px;
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+.terminal-dot { width: 8px; height: 8px; border-radius: 50%; }
+.terminal-dot.red    { background: #ff5f57; }
+.terminal-dot.yellow { background: #febc2e; }
+.terminal-dot.green  { background: #28c840; }
+.terminal-title { font-size: .68rem; color: var(--cyan); letter-spacing: .1em; text-transform: uppercase; margin-left: 4px; }
+.terminal-body {
+  flex: 1; overflow-y: auto; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.terminal-line {
+  font-size: .72rem; line-height: 1.5;
+  color: #88ffcc;
+  animation: termFade .2s ease;
+}
+.terminal-line.dim   { color: var(--text-dim); }
+.terminal-line.error { color: var(--red); }
+.terminal-line.warn  { color: var(--yellow); }
+@keyframes termFade {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.terminal-cursor {
+  display: inline-block; width: 7px; height: 13px;
+  background: var(--cyan); margin-left: 2px; vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Accuracy chart card */
+.chart-card {
+  background: var(--surface);
+  border: 1px solid rgba(0,212,255,.15);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+}
+.chart-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.chart-wrap { position: relative; height: 240px; }
+
+/* SSE connection indicator */
+.sse-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-dim); margin-right: 6px;
+  display: inline-block; transition: background .3s;
+}
+.sse-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: ssePulse 2s ease infinite; }
+.sse-dot.error     { background: var(--red); }
+@keyframes ssePulse { 50% { box-shadow: 0 0 16px var(--green); } }
+
+/* ── Toast ──────────────────────────────────────────────────────── */
 .toast {
   position: fixed; bottom: 24px; right: 24px; z-index: 999;
   background: var(--bg3); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px 20px;
-  font-size: .82rem; max-width: 320px;
-  box-shadow: var(--shadow);
-  transform: translateY(20px); opacity: 0;
-  transition: all .25s ease;
+  font-size: .82rem; max-width: 320px; box-shadow: var(--shadow);
+  transform: translateY(20px); opacity: 0; transition: all .25s ease;
   pointer-events: none;
 }
 .toast.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
-.toast.error { border-color: rgba(255,77,109,.4); color: var(--red); }
+.toast.error   { border-color: rgba(255,77,109,.4); color: var(--red); }
 .toast.success { border-color: rgba(61,255,160,.3); color: var(--green); }
+.toast.info    { border-color: rgba(0,212,255,.3);  color: var(--cyan); }
 
-/* ── Scrollbar ─────────────────────────────────────────────────── */
+/* ── Scrollbar ──────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(155,89,245,.3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--purple); }
+
+@media (max-width: 600px) { .triage-grid { grid-template-columns: 1fr 1fr !important; } }
 </style>
 </head>
 <body>
@@ -320,39 +417,34 @@ tbody td { padding: 11px 16px; vertical-align: middle; }
       <h1>Report <span>Analyzer</span></h1>
     </div>
     <div class="mode-toggle" role="tablist" aria-label="Mode selector">
-      <button class="mode-btn active" id="btn-single" onclick="switchMode('single')" role="tab" aria-selected="true">Analysis</button>
-      <button class="mode-btn"        id="btn-triage" onclick="switchMode('triage')" role="tab" aria-selected="false">⚡ Triage</button>
+      <button class="mode-btn active"  id="btn-single" onclick="switchMode('single')" role="tab" aria-selected="true">Analysis</button>
+      <button class="mode-btn"         id="btn-triage" onclick="switchMode('triage')" role="tab" aria-selected="false">⚡ Triage</button>
+      <button class="mode-btn"         id="btn-fl"     onclick="switchMode('fl')"     role="tab" aria-selected="false">🛰 Fed. Tower</button>
     </div>
   </header>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       PANEL A — Original single-file analysis
-  ════════════════════════════════════════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════
+       PANEL A — Single X-ray analysis
+  ══════════════════════════════════════════════════════════════ -->
   <div id="panel-single">
-
-    <!-- Chest X-ray → Pneumonia -->
     <div class="card">
-      <p class="section-title">Chest X-Ray · Pneumonia</p>
-      <div class="upload-zone" id="zone-img" ondragover="onDrag(event,this)" ondragleave="offDrag(this)" ondrop="onDropImg(event)">
-        <input type="file" id="file-img" accept=".jpg,.jpeg,.png" onchange="handleImg()">
+      <p class="section-title">Chest X-Ray · Pneumonia · Privacy-Preserving Pipeline</p>
+      <div class="upload-zone" id="zone-img" ondragover="onDrag(event,this)" ondragleave="offDrag(this)" ondrop="onDropImg(event)" onclick="openImgPicker(event)">
+        <input type="file" id="file-img" accept=".jpg,.jpeg,.png" onchange="handleImg()" style="display:none;">
         <div class="upload-icon">🩻</div>
-        <p><strong>Drop an X-ray here</strong><br>JPG or PNG</p>
+        <p><strong>Drop an X-ray here</strong><br>JPG or PNG · Analyzed locally · Zero images sent externally</p>
       </div>
       <div style="margin-top:14px; text-align:right;">
-        <button class="btn btn-primary" id="analyze-img-btn" onclick="analyzeImg()" disabled>Analyze X-Ray</button>
+        <button type="button" class="btn btn-primary" id="analyze-img-btn" onclick="analyzeImg()" disabled>Analyze X-Ray</button>
       </div>
       <div class="result-box" id="result-img"></div>
     </div>
+  </div>
 
-  </div><!-- /panel-single -->
-
-
-  <!-- ═══════════════════════════════════════════════════════════════
+  <!-- ═══════════════════════════════════════════════════════════
        PANEL B — Triage Dashboard
-  ════════════════════════════════════════════════════════════════ -->
-  <div id="panel-triage">
-
-    <!-- Stats row -->
+  ══════════════════════════════════════════════════════════════ -->
+  <div id="panel-triage" style="display:none;">
     <div class="triage-grid" style="grid-template-columns:repeat(4,1fr);">
       <div class="stat-card stat-purple"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total Queued</div></div>
       <div class="stat-card stat-red">   <div class="stat-value" id="stat-high">0</div> <div class="stat-label">High Priority</div></div>
@@ -360,164 +452,299 @@ tbody td { padding: 11px 16px; vertical-align: middle; }
       <div class="stat-card stat-green"> <div class="stat-value" id="stat-low">0</div>  <div class="stat-label">Low Priority</div></div>
     </div>
 
-    <!-- Upload card -->
     <div class="card" style="margin-bottom:20px;">
       <p class="section-title">Bulk Upload · Chest X-Rays</p>
-
-      <div class="upload-zone" id="zone-bulk" ondragover="onDrag(event,this)" ondragleave="offDrag(this)" ondrop="onDropBulk(event)">
-        <input type="file" id="file-bulk" accept=".jpg,.jpeg,.png" multiple onchange="handleBulkSelect()">
+      <div class="upload-zone" id="zone-bulk" ondragover="onDrag(event,this)" ondragleave="offDrag(this)" ondrop="onDropBulk(event)" onclick="openBulkPicker(event)">
+        <input type="file" id="file-bulk" accept=".jpg,.jpeg,.png" multiple onchange="handleBulkSelect()" style="display:none;">
         <div class="upload-icon">🗂️</div>
         <p><strong>Select or drop 1–20 chest X-ray images</strong><br>JPG / PNG — batch processed with severity scoring</p>
       </div>
-
       <ul class="upload-list" id="upload-list"></ul>
-
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:10px;">
         <span id="bulk-file-count" style="font-size:.8rem;color:var(--text-dim)">No files selected</span>
         <div style="display:flex;gap:10px;">
-          <button class="btn btn-ghost" onclick="clearTriage()">Clear Queue</button>
-          <button class="btn btn-primary" id="bulk-submit-btn" onclick="submitBulk()" disabled>Run Triage</button>
+          <button type="button" class="btn btn-ghost" onclick="clearTriage()">Clear Queue</button>
+          <button type="button" class="btn btn-primary" id="bulk-submit-btn" onclick="submitBulk()">Run Triage</button>
         </div>
       </div>
     </div>
 
-    <!-- Priority table -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
         <p class="section-title" style="margin-bottom:0">Priority Queue — Severity Descending</p>
-        <button class="btn btn-ghost" style="font-size:.75rem;padding:6px 14px;" onclick="refreshQueue()">↻ Refresh</button>
+        <button type="button" class="btn btn-ghost" style="font-size:.75rem;padding:6px 14px;" onclick="refreshQueue()">↻ Refresh</button>
       </div>
-
       <div class="triage-table-wrap" id="triage-table-wrap">
-        <div class="empty-state">
-          <div class="empty-icon">📋</div>
-          <p>No analyses yet. Upload X-rays to populate the queue.</p>
-        </div>
+        <div class="empty-state"><div class="empty-icon">📋</div><p>No analyses yet. Upload X-rays to populate the queue.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       PANEL C — Federated Control Tower
+  ══════════════════════════════════════════════════════════════ -->
+  <div id="panel-fl">
+
+    <!-- Control row -->
+    <div class="fl-control-row">
+      <button class="btn btn-cyan" id="fl-trigger-btn" onclick="triggerFLRound()">
+        ⚡ Trigger Training Round
+      </button>
+      <span class="rounds-label">Rounds:</span>
+      <input type="number" class="rounds-input" id="fl-rounds" value="1" min="1" max="10">
+      <div style="margin-left:auto; display:flex; align-items:center; gap:8px; font-size:.75rem; color:var(--text-dim);">
+        <span class="sse-dot" id="sse-dot"></span>
+        <span id="sse-status">Connecting…</span>
       </div>
     </div>
 
-  </div><!-- /panel-triage -->
+    <!-- Node monitors -->
+    <div class="node-grid">
+      <div class="node-card" id="node-hospital_a">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="ring-track" cx="40" cy="40" r="35"/>
+            <circle class="ring-fill" id="ring-hospital_a" cx="40" cy="40" r="35"/>
+          </svg>
+          <div class="ring-center">🏥</div>
+        </div>
+        <div>
+          <div class="node-title">Hospital A</div>
+          <div class="node-port">Port 5001</div>
+        </div>
+        <span class="node-badge idle" id="badge-hospital_a">Idle</span>
+      </div>
+
+      <div class="node-card" id="node-hospital_b">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="ring-track" cx="40" cy="40" r="35"/>
+            <circle class="ring-fill" id="ring-hospital_b" cx="40" cy="40" r="35"/>
+          </svg>
+          <div class="ring-center">🏥</div>
+        </div>
+        <div>
+          <div class="node-title">Hospital B</div>
+          <div class="node-port">Port 5002</div>
+        </div>
+        <span class="node-badge idle" id="badge-hospital_b">Idle</span>
+      </div>
+
+      <div class="node-card" id="node-hospital_c">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle class="ring-track" cx="40" cy="40" r="35"/>
+            <circle class="ring-fill" id="ring-hospital_c" cx="40" cy="40" r="35"/>
+          </svg>
+          <div class="ring-center">🏥</div>
+        </div>
+        <div>
+          <div class="node-title">Hospital C</div>
+          <div class="node-port">Port 5003</div>
+        </div>
+        <span class="node-badge idle" id="badge-hospital_c">Idle</span>
+      </div>
+    </div>
+
+    <!-- Terminal + Chart row -->
+    <div class="fl-lower-grid">
+
+      <!-- HUD Terminal -->
+      <div>
+        <p class="section-title section-title-cyan" style="margin-bottom:10px;">System Log</p>
+        <div class="terminal">
+          <div class="terminal-header">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">FL · ORCHESTRATOR · STDOUT</span>
+          </div>
+          <div class="terminal-body" id="terminal-body">
+            <div class="terminal-line dim">Awaiting connection to backend SSE stream…</div>
+            <div class="terminal-line dim">Start the backend and press ⚡ to begin a training round.<span class="terminal-cursor"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live accuracy chart -->
+      <div>
+        <p class="section-title section-title-cyan" style="margin-bottom:10px;">Global Accuracy</p>
+        <div class="chart-card">
+          <div class="chart-header">
+            <span style="font-size:.75rem;color:var(--text-dim);">Accuracy vs. Round</span>
+            <button class="btn btn-ghost" style="font-size:.68rem;padding:4px 10px;" onclick="resetChart()">↺ Reset</button>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="accuracy-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /panel-fl -->
 
 </div><!-- /wrapper -->
 
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<style>
-  @media (max-width: 600px) {
-    .triage-grid { grid-template-columns: 1fr 1fr !important; }
-  }
-</style>
-
 <script>
-/* ── Config ──────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   CONFIG
+══════════════════════════════════════════════════════════════ */
 const API = 'http://localhost:5000';
 
-/* ── Mode switching ──────────────────────────────────────────── */
-function switchMode(mode) {
-  document.getElementById('panel-single').style.display = mode === 'single' ? 'block' : 'none';
-  document.getElementById('panel-triage').style.display = mode === 'triage' ? 'block' : 'none';
-  document.getElementById('btn-single').classList.toggle('active', mode === 'single');
-  document.getElementById('btn-triage').classList.toggle('active', mode === 'triage');
-  if (mode === 'triage') refreshQueue();
+/* ═══════════════════════════════════════════════════════════════
+   UPLOAD ZONE OPENERS  — only open picker when click is ON the zone
+   itself, not on child buttons that happen to be nearby
+══════════════════════════════════════════════════════════════ */
+function openImgPicker(e) {
+  if (e.target.closest('button')) return;
+  document.getElementById('file-img').click();
+}
+function openBulkPicker(e) {
+  if (e.target.closest('button')) return;
+  document.getElementById('file-bulk').click();
 }
 
-/* ── Toast ───────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   TAB SWITCHING
+══════════════════════════════════════════════════════════════ */
+function switchMode(mode) {
+  ['single','triage','fl'].forEach(m => {
+    document.getElementById(`panel-${m}`).style.display = m === mode ? 'block' : 'none';
+    const btn = document.getElementById(`btn-${m}`);
+    btn.classList.remove('active','active-cyan');
+    if (m === mode) {
+      btn.classList.add(m === 'fl' ? 'active-cyan' : 'active');
+    }
+  });
+  // Reset stuck processing state when navigating away from triage
+  if (mode !== 'triage' && isProcessing) {
+    isProcessing = false;
+    const btn = document.getElementById('bulk-submit-btn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Triage'; }
+  }
+  if (mode === 'triage') refreshQueue();
+  if (mode === 'fl')     initFLPanel();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════════════════════ */
 let toastTimer;
 function toast(msg, type = '') {
   const el = document.getElementById('toast');
   el.textContent = msg;
-  el.className = 'toast show ' + type;
+  el.className   = 'toast show ' + type;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
 }
 
-/* ── Drag helpers ────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   DRAG HELPERS
+══════════════════════════════════════════════════════════════ */
 function onDrag(e, el)  { e.preventDefault(); el.classList.add('drag-over'); }
 function offDrag(el)    { el.classList.remove('drag-over'); }
 function onDropImg(e) {
   e.preventDefault(); offDrag(document.getElementById('zone-img'));
   const inp = document.getElementById('file-img');
-  const dt  = new DataTransfer();
-  dt.items.add(e.dataTransfer.files[0]);
-  inp.files = dt.files;
-  handleImg();
+  const dt  = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]);
+  inp.files = dt.files; handleImg();
 }
 function onDropBulk(e) {
   e.preventDefault(); offDrag(document.getElementById('zone-bulk'));
   const inp = document.getElementById('file-bulk');
   const dt  = new DataTransfer();
   Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
-  inp.files = dt.files;
-  handleBulkSelect();
+  inp.files = dt.files; handleBulkSelect();
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PANEL A  —  Single X-ray analysis
+   PANEL A — Single X-ray analysis (Privacy-Preserving Pipeline)
 ══════════════════════════════════════════════════════════════ */
 let imgFile = null;
 
 function handleImg() {
   imgFile = document.getElementById('file-img').files[0] || null;
   document.getElementById('analyze-img-btn').disabled = !imgFile;
-  if (imgFile) document.getElementById('zone-img').querySelector('p').innerHTML = `<strong>${imgFile.name}</strong>`;
+  if (imgFile) document.getElementById('zone-img').querySelector('p').innerHTML =
+    `<strong>${imgFile.name}</strong><br><span style="font-size:.72rem;color:var(--cyan)">Ready · local analysis only</span>`;
 }
 
 async function analyzeImg() {
   if (!imgFile) return;
   const btn = document.getElementById('analyze-img-btn');
   const box = document.getElementById('result-img');
-  btn.disabled = true;
-  btn.textContent = 'Analyzing…';
-  box.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Analyzing…'; box.style.display = 'none';
+
   const fd = new FormData();
   fd.append('file', imgFile);
   try {
     const res  = await fetch(API + '/api/analyze/image', { method: 'POST', body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Server error');
+
     const badgeClass = data.detected ? 'badge-detected' : 'badge-normal';
     const badgeText  = data.detected ? 'Pneumonia Detected' : 'Normal';
+    const sevColor   = data.severity_score >= 70 ? 'var(--red)' : data.severity_score >= 40 ? 'var(--yellow)' : 'var(--green)';
+    const ttaText    = data.tta_passes ? `TTA · ${data.tta_passes} passes` : '';
+    const privSummary = data.privacy ? data.privacy.anonymised_summary : '';
+
     box.innerHTML = `
       <div class="result-header">
         <strong style="font-size:.95rem;">Pneumonia Analysis</strong>
-        <span class="badge ${badgeClass}">${badgeText}</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          ${ttaText ? `<span style="font-size:.68rem;color:var(--text-dim);font-family:var(--mono);">${ttaText}</span>` : ''}
+          <span class="badge ${badgeClass}">${badgeText}</span>
+          <span class="badge badge-privacy" title="Zero images sent externally">🔒 Privacy-Safe</span>
+        </div>
       </div>
       <div class="confidence-bar-wrap">
-        <div class="confidence-label"><span>Confidence</span><span>${data.confidence}%</span></div>
+        <div class="confidence-label"><span>Confidence</span><span>${data.confidence?.toFixed(1)}%</span></div>
         <div class="confidence-bar"><div class="confidence-fill" style="width:${data.confidence}%"></div></div>
       </div>
-      <p style="font-size:.75rem;color:var(--text-dim);margin:10px 0 6px;">AI Reasoning (Groq · Llama 3.1)</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0;">
+        <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:1.3rem;font-weight:700;color:var(--green);">${data.normal_prob?.toFixed(1)}%</div>
+          <div style="font-size:.65rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">P(Normal)</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:1.3rem;font-weight:700;color:${sevColor};">${data.pneumonia_prob?.toFixed(1)}%</div>
+          <div style="font-size:.65rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">P(Pneumonia)</div>
+        </div>
+      </div>
+      ${privSummary ? `<div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.15);border-radius:8px;padding:10px 14px;font-size:.68rem;font-family:var(--mono);color:var(--cyan);margin-bottom:10px;word-break:break-all;">🔒 Sent to AI: ${privSummary}</div>` : ''}
+      <p style="font-size:.75rem;color:var(--text-dim);margin:10px 0 6px;">AI Reasoning (Groq · Llama 3.1 · anonymised metrics only)</p>
       <div class="reasoning-box">${data.reasoning || 'No reasoning returned.'}</div>`;
     box.style.display = 'block';
   } catch (err) {
     toast(err.message, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Analyze X-Ray';
+    btn.disabled = false; btn.textContent = 'Analyze X-Ray';
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PANEL B  —  Triage  (live per-image processing)
+   PANEL B — Triage
 ══════════════════════════════════════════════════════════════ */
-let selectedFiles  = [];
-let liveQueue      = [];   // in-memory queue, re-sorted after each result
-let isProcessing   = false;
+let selectedFiles = [], liveQueue = [], isProcessing = false;
 
-// ── File selection ────────────────────────────────────────────
+// Ensure button starts disabled
+document.getElementById('bulk-submit-btn').disabled = true;
+
 function handleBulkSelect() {
   const inp = document.getElementById('file-bulk');
-  selectedFiles = Array.from(inp.files).slice(0, 20);
-  document.getElementById('bulk-file-count').textContent = selectedFiles.length
-    ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
-    : 'No files selected';
+  const all = Array.from(inp.files);
+  if (all.length > 20) {
+    toast('Maximum 20 files allowed. First 20 selected.', 'error');
+  }
+  selectedFiles = all.slice(0, 20);
+  document.getElementById('bulk-file-count').textContent =
+    selectedFiles.length ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected` : 'No files selected';
   document.getElementById('bulk-submit-btn').disabled = selectedFiles.length === 0;
-  // Show queued list
   renderUploadList(selectedFiles.map(f => ({ name: f.name, state: 'queued' })));
 }
 
-// ── Upload list (sidebar checklist) ──────────────────────────
 function setItemState(i, state, detail = '') {
   const el = document.getElementById(`uitem-${i}`);
   if (!el) return;
@@ -534,90 +761,58 @@ function renderUploadList(items) {
   document.getElementById('upload-list').innerHTML = items.map((it, i) => `
     <li class="upload-item" id="uitem-${i}">
       <span class="file-name" title="${it.name}">${it.name}</span>
-      <span class="file-status">
-        ${it.state === 'queued' ? '<span style="color:var(--text-dim)">○</span> Queued' : ''}
-      </span>
+      <span class="file-status"><span style="color:var(--text-dim)">○</span> Queued</span>
     </li>`).join('');
 }
 
-// ── Main: process one file at a time, update table live ───────
 async function submitBulk() {
   if (!selectedFiles.length || isProcessing) return;
   isProcessing = true;
-
   const btn = document.getElementById('bulk-submit-btn');
-  btn.disabled = true;
-  btn.textContent = `0 / ${selectedFiles.length} done`;
-
-  // Reset in-memory queue for this batch
-  liveQueue = [];
-  renderQueue(liveQueue);   // show empty state while we start
-
+  btn.disabled = true; btn.textContent = `0 / ${selectedFiles.length} done`;
+  liveQueue = []; renderQueue(liveQueue);
   let doneCount = 0, errCount = 0;
 
-  for (let i = 0; i < selectedFiles.length; i++) {
-    const file = selectedFiles[i];
-    setItemState(i, 'processing');
-
-    const fd = new FormData();
-    fd.append('file', file);
-
-    try {
-      const res  = await fetch(API + '/api/triage/analyze-one', { method: 'POST', body: fd });
-      const data = await res.json();
-
-      if (!res.ok || data.status === 'Error') {
-        throw new Error(data.error || 'Model error');
+  try {
+    for (let i = 0; i < selectedFiles.length; i++) {
+      setItemState(i, 'processing');
+      const fd = new FormData(); fd.append('file', selectedFiles[i]);
+      try {
+        const res  = await fetch(API + '/api/triage/analyze-one', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || data.status === 'Error') throw new Error(data.error || 'Model error');
+        liveQueue.push(data);
+        liveQueue.sort((a, b) => (b.severity_score ?? 0) - (a.severity_score ?? 0));
+        setItemState(i, 'done'); doneCount++;
+      } catch (err) {
+        setItemState(i, 'error', err.message.slice(0, 30)); errCount++;
       }
-
-      // Push result into live queue and re-sort by severity descending
-      liveQueue.push(data);
-      liveQueue.sort((a, b) => (b.severity_score ?? 0) - (a.severity_score ?? 0));
-
-      setItemState(i, 'done');
-      doneCount++;
-    } catch (err) {
-      setItemState(i, 'error', err.message.slice(0, 30));
-      errCount++;
+      renderQueue(liveQueue); updateStats(liveQueue);
+      btn.textContent = `${doneCount + errCount} / ${selectedFiles.length} done`;
     }
-
-    // Update table and stats after every single image
-    renderQueue(liveQueue);
-    updateStats(liveQueue);
-    btn.textContent = `${doneCount + errCount} / ${selectedFiles.length} done`;
+    toast(`✓ ${doneCount} analyzed${errCount ? ', ' + errCount + ' errors' : ''}`, errCount ? 'error' : 'success');
+  } finally {
+    isProcessing = false; btn.disabled = false; btn.textContent = 'Run Triage';
   }
-
-  isProcessing = false;
-  btn.disabled = false;
-  btn.textContent = 'Run Triage';
-  toast(
-    `✓ ${doneCount} analyzed${errCount ? ', ' + errCount + ' errors' : ''}`,
-    errCount ? 'error' : 'success'
-  );
 }
 
-// ── Refresh from DB (for persisted history) ───────────────────
 async function refreshQueue() {
   try {
     const res  = await fetch(API + '/api/triage/queue');
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
     const data = await res.json();
     liveQueue  = data.queue || [];
-    renderQueue(liveQueue);
-    updateStats(liveQueue);
-  } catch {
-    toast('Cannot reach backend.', 'error');
-  }
+    renderQueue(liveQueue); updateStats(liveQueue);
+  } catch (err) { toast('Cannot reach backend: ' + err.message, 'error'); }
 }
 
-// ── Stats bar ─────────────────────────────────────────────────
-function updateStats(queue) {
-  document.getElementById('stat-total').textContent = queue.length;
-  document.getElementById('stat-high').textContent  = queue.filter(r => r.priority === 'High').length;
-  document.getElementById('stat-med').textContent   = queue.filter(r => r.priority === 'Medium').length;
-  document.getElementById('stat-low').textContent   = queue.filter(r => r.priority === 'Low').length;
+function updateStats(q) {
+  document.getElementById('stat-total').textContent = q.length;
+  document.getElementById('stat-high').textContent  = q.filter(r => r.priority === 'High').length;
+  document.getElementById('stat-med').textContent   = q.filter(r => r.priority === 'Medium').length;
+  document.getElementById('stat-low').textContent   = q.filter(r => r.priority === 'Low').length;
 }
 
-// ── Rendering helpers ─────────────────────────────────────────
 function priorityPill(p) {
   if (!p || p === 'Pending') return `<span class="pill pill-pending">⏳ Pending</span>`;
   if (p === 'High')   return `<span class="pill pill-high">🔴 High</span>`;
@@ -628,11 +823,7 @@ function priorityPill(p) {
 function severityBar(score, priority) {
   const w   = score != null ? score : 0;
   const cls = priority === 'High' ? 'high' : priority === 'Medium' ? 'medium' : 'low';
-  return `
-    <div class="sev-bar-wrap">
-      <div class="sev-bar"><div class="sev-fill ${cls}" style="width:${w}%"></div></div>
-      <span style="font-size:.72rem;color:var(--text-dim);min-width:38px;text-align:right;">${score != null ? score.toFixed(1)+'%' : '—'}</span>
-    </div>`;
+  return `<div class="sev-bar-wrap"><div class="sev-bar"><div class="sev-fill ${cls}" style="width:${w}%"></div></div><span style="font-size:.72rem;color:var(--text-dim);min-width:38px;text-align:right;">${score != null ? score.toFixed(1)+'%' : '—'}</span></div>`;
 }
 
 function renderQueue(queue) {
@@ -641,7 +832,6 @@ function renderQueue(queue) {
     wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>No analyses yet. Upload X-rays to populate the queue.</p></div>`;
     return;
   }
-
   const rows = queue.map(r => {
     const predClass = r.prediction === 'PNEUMONIA' ? 'pneumonia' : 'normal';
     return `<tr>
@@ -651,28 +841,20 @@ function renderQueue(queue) {
       <td style="font-family:var(--mono);">${r.confidence != null ? r.confidence.toFixed(1)+'%' : '—'}</td>
       <td>${severityBar(r.severity_score, r.priority)}</td>
       <td>${priorityPill(r.priority)}</td>
-      <td style="font-size:.72rem;color:var(--text-dim);font-family:var(--mono);">${(r.timestamp||'').slice(0,19).replace('T',' ') || '—'}</td>
+      <td style="font-size:.72rem;color:var(--text-dim);font-family:var(--mono);">${r.timestamp ? r.timestamp.slice(0,19).replace('T',' ') : '—'}</td>
     </tr>`;
   }).join('');
-
-  wrap.innerHTML = `
-    <table>
-      <thead>
-        <tr>
-          <th>#</th><th>Filename</th><th>Prediction</th>
-          <th>Confidence</th><th class="sort-active">Severity ▾</th>
-          <th>Priority</th><th>Timestamp</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  wrap.innerHTML = `<table>
+    <thead><tr><th>#</th><th>Filename</th><th>Prediction</th><th>Confidence</th><th class="sort-active">Severity ▾</th><th>Priority</th><th>Timestamp</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
-// ── Clear ─────────────────────────────────────────────────────
 async function clearTriage() {
   if (!confirm('Clear the entire triage queue from the database?')) return;
   try {
-    await fetch(API + '/api/triage/clear', { method: 'DELETE' });
+    const res = await fetch(API + '/api/triage/clear', { method: 'DELETE' });
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
     selectedFiles = []; liveQueue = [];
     document.getElementById('file-bulk').value = '';
     document.getElementById('upload-list').innerHTML = '';
@@ -680,9 +862,247 @@ async function clearTriage() {
     document.getElementById('bulk-submit-btn').disabled = true;
     renderQueue([]); updateStats([]);
     toast('Queue cleared.', 'success');
-  } catch {
-    toast('Clear failed.', 'error');
+  } catch (err) { toast('Clear failed: ' + err.message, 'error'); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PANEL C — FEDERATED CONTROL TOWER
+══════════════════════════════════════════════════════════════ */
+
+// ── Chart.js setup ────────────────────────────────────────────
+let accuracyChart = null;
+
+function initChart() {
+  if (accuracyChart) return;
+  const ctx = document.getElementById('accuracy-chart').getContext('2d');
+  accuracyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Global Accuracy',
+        data: [],
+        borderColor: '#00d4ff',
+        backgroundColor: 'rgba(0,212,255,.08)',
+        borderWidth: 2,
+        pointBackgroundColor: '#00d4ff',
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        tension: 0.35,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#10101a',
+          borderColor: 'rgba(0,212,255,.3)',
+          borderWidth: 1,
+          titleColor: '#00d4ff',
+          bodyColor: '#e8e8f0',
+          callbacks: {
+            label: ctx => `Accuracy: ${(ctx.parsed.y * 100).toFixed(1)}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#888899', font: { family: "'JetBrains Mono'" } },
+          grid:  { color: 'rgba(255,255,255,.04)' },
+          title: { display: true, text: 'Round', color: '#888899' }
+        },
+        y: {
+          min: 0.5, max: 1.0,
+          ticks: {
+            color: '#888899', font: { family: "'JetBrains Mono'" },
+            callback: v => (v * 100).toFixed(0) + '%'
+          },
+          grid: { color: 'rgba(255,255,255,.04)' },
+          title: { display: true, text: 'Accuracy', color: '#888899' }
+        }
+      }
+    }
+  });
+}
+
+function resetChart() {
+  if (!accuracyChart) return;
+  accuracyChart.data.labels = [];
+  accuracyChart.data.datasets[0].data = [];
+  accuracyChart.update();
+}
+
+function pushChartPoint(round, accuracy) {
+  if (!accuracyChart) return;
+  accuracyChart.data.labels.push(`R${round}`);
+  accuracyChart.data.datasets[0].data.push(accuracy);
+  accuracyChart.update();
+}
+
+// ── Terminal ──────────────────────────────────────────────────
+const MAX_TERM_LINES = 200;
+
+function termLog(text, cls = '') {
+  const body = document.getElementById('terminal-body');
+  if (!body) return;
+
+  // Remove cursor from last line
+  body.querySelectorAll('.terminal-cursor').forEach(el => el.remove());
+
+  // Split multi-line messages
+  const lines = text.split('\n').filter(l => l.trim() !== '');
+  lines.forEach(line => {
+    const div = document.createElement('div');
+    div.className = 'terminal-line' + (cls ? ' ' + cls : '');
+    div.textContent = line;
+    body.appendChild(div);
+  });
+
+  // Add cursor to last line
+  const cursor = document.createElement('span');
+  cursor.className = 'terminal-cursor';
+  body.lastElementChild?.appendChild(cursor);
+
+  // Prune old lines
+  while (body.children.length > MAX_TERM_LINES) body.removeChild(body.firstChild);
+
+  body.scrollTop = body.scrollHeight;
+}
+
+// ── Node state management ─────────────────────────────────────
+function setNodeStatus(nodeId, status) {
+  const card  = document.getElementById(`node-${nodeId}`);
+  const badge = document.getElementById(`badge-${nodeId}`);
+  const ring  = document.getElementById(`ring-${nodeId}`);
+  if (!card || !badge || !ring) return;
+
+  // Reset classes
+  card.className  = 'node-card';
+  badge.className = 'node-badge';
+
+  const labels = { idle: 'Idle', training: '🟢 Training', offline: 'Offline', error: '⚠ Error' };
+
+  if (status === 'training') {
+    card.classList.add('training');
+    badge.classList.add('training');
+    ring.classList.add('spinning');
+  } else {
+    ring.classList.remove('spinning');
+    ring.style.strokeDashoffset = '220';
+    if (status === 'offline') card.classList.add('offline');
+    badge.classList.add(status === 'error' ? 'error' : 'idle');
   }
+  badge.textContent = labels[status] || status;
+}
+
+// ── SSE EventSource ───────────────────────────────────────────
+let _sseSource = null;
+
+function connectSSE() {
+  if (_sseSource) { _sseSource.close(); _sseSource = null; }
+
+  const dot    = document.getElementById('sse-dot');
+  const status = document.getElementById('sse-status');
+
+  _sseSource = new EventSource(API + '/api/federated/stream');
+
+  _sseSource.onopen = () => {
+    dot.className   = 'sse-dot connected';
+    status.textContent = 'SSE Connected';
+    termLog('[SSE] Stream connected to orchestrator.', 'dim');
+  };
+
+  _sseSource.onerror = () => {
+    dot.className   = 'sse-dot error';
+    status.textContent = 'SSE Offline';
+  };
+
+  _sseSource.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+
+    const { type, data } = msg;
+
+    if (type === 'connected') {
+      termLog('[SSE] Handshake complete — ready for FL events.', 'dim');
+    }
+
+    else if (type === 'round_start') {
+      termLog(`\n[ROUND ${data.round}/${data.total}] ═══ Starting ═══`);
+      document.getElementById('fl-trigger-btn').disabled = true;
+    }
+
+    else if (type === 'node_status') {
+      setNodeStatus(data.id, data.status);
+    }
+
+    else if (type === 'log_stream') {
+      const txt   = data.log || '';
+      const isErr = txt.includes('✗') || txt.toLowerCase().includes('error') || txt.toLowerCase().includes('failed');
+      termLog(txt, isErr ? 'error' : '');
+    }
+
+    else if (type === 'round_complete') {
+      const acc = (data.global_accuracy * 100).toFixed(2);
+      termLog(`[ROUND ${data.round}] ✅ Complete — Global Accuracy: ${acc}%`);
+      pushChartPoint(data.round, data.global_accuracy);
+      toast(`Round ${data.round} complete · Accuracy: ${acc}%`, 'info');
+    }
+
+    else if (type === 'fl_done') {
+      termLog(`\n[FL] ✅ All rounds complete.`);
+      document.getElementById('fl-trigger-btn').disabled = false;
+      // Reset all nodes to idle
+      ['hospital_a','hospital_b','hospital_c'].forEach(id => setNodeStatus(id, 'idle'));
+    }
+
+    else if (type === 'fl_error') {
+      termLog(`[FL] ✗ Error: ${data.message}`, 'error');
+      document.getElementById('fl-trigger-btn').disabled = false;
+    }
+  };
+}
+
+// ── Trigger training round ────────────────────────────────────
+async function triggerFLRound() {
+  const rounds = parseInt(document.getElementById('fl-rounds').value) || 1;
+  document.getElementById('fl-trigger-btn').disabled = true;
+  termLog(`\n[UI] Triggering ${rounds} federated round(s)…`);
+
+  try {
+    const res  = await fetch(API + '/api/federated/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rounds }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Backend error');
+    termLog(`[UI] Backend acknowledged: ${data.message}`, 'dim');
+    toast(`FL started · ${rounds} round(s)`, 'info');
+  } catch (err) {
+    termLog(`[UI] ✗ Failed to trigger: ${err.message}`, 'error');
+    toast(err.message, 'error');
+    document.getElementById('fl-trigger-btn').disabled = false;
+  }
+}
+
+// ── FL panel init (called once when tab is opened) ────────────
+let _flInited = false;
+function initFLPanel() {
+  if (_flInited) return;
+  _flInited = true;
+  initChart();
+  connectSSE();
+
+  // Probe node liveness and update badges
+  fetch(API + '/api/federated/nodes')
+    .then(r => r.json())
+    .then(d => {
+      d.nodes.forEach(n => setNodeStatus(n.id, n.online ? 'idle' : 'offline'));
+    })
+    .catch(() => {});
 }
 </script>
 </body>

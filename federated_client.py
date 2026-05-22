@@ -92,9 +92,27 @@ def _build_dataloader() -> DataLoader:
 
 
 def _build_model() -> nn.Module:
-    """Instantiate the EfficientNet-B0 architecture with a binary output head."""
+    """
+    Instantiate EfficientNet-B0 with the regularised classifier head.
+
+    This head MUST be identical to the one used in simple_backend.py and
+    train_model.py — all three files must stay in sync or state_dict keys
+    will mismatch and loading will crash with 'Unexpected key(s)' errors.
+
+    Head layout:
+        Dropout(0.4) → Linear(1280, 512) → ReLU →
+        BatchNorm1d(512) → Dropout(0.2) → Linear(512, 2)
+    """
     model = models.efficientnet_b0(weights=None)
-    model.classifier[1] = nn.Linear(model.classifier[1].in_features, NUM_CLASSES)
+    in_features = model.classifier[1].in_features   # 1280 for EfficientNet-B0
+    model.classifier = nn.Sequential(
+        nn.Dropout(p=0.4),
+        nn.Linear(in_features, 512),
+        nn.ReLU(),
+        nn.BatchNorm1d(512),
+        nn.Dropout(p=0.2),
+        nn.Linear(512, NUM_CLASSES),
+    )
     return model
 
 

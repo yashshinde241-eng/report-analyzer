@@ -1,208 +1,243 @@
-# SESSION_STATE.md — Report Analyzer Phase 1
-**Last Updated:** Phase 1 complete  
-**Status:** All Section A refactoring done · All Section B FL files built · Ready for Phase 2
+# SESSION_STATE.md — Report Analyzer Phase 1 + 1.5 + 2
+**Last Updated:** Phase 2 complete
+**Status:** All sections built, verified, and ready for use
 
 ---
 
 ## 1. Executive Summary
 
-`report-analyzer` is a Flask-based medical imaging web application that classifies chest X-rays for pneumonia using an EfficientNet-B0 PyTorch model, generates structured AI reasoning via the Groq Llama 3.1 API, and provides a priority-sorted triage queue backed by SQLite.
+`report-analyzer` is a full-stack medical imaging web application comprising:
 
-**Phase 1** delivered two major upgrades:
+- **Flask backend** (`simple_backend.py`) — REST API + SSE streaming, local EfficientNet-B0 TTA inference, privacy-preserving Groq pipeline, SQLite triage queue
+- **Vanilla JS frontend** (`report-analyzer.html`) — 3-panel SPA: Analysis, Triage Dashboard, Federated Control Tower
+- **Federated Learning pipeline** — 3 simulated hospital nodes (`federated_client.py`) coordinated by a FedAvg orchestrator (`federated_server.py`)
+- **Robustness layer** (`xray_transforms.py`) — CLAHE preprocessing, Albumentations augmentation, TTA inference
 
-- **Section A — Stabilisation:** Hardcoded Windows paths eliminated, severity scores normalised to a uniform 0–100 scale across all DB writes and API responses, MIME/extension validation added to all upload endpoints, PyTorch loading modernised with `weights_only=True`, a graceful startup model-missing guard implemented, and `test_backend.py` fully rewritten to match the actual endpoint contracts.
-
-- **Section B — Federated Learning:** Three new files (`data_splitter.py`, `federated_client.py`, `federated_server.py`) implement a fully operational simulated multi-hospital Federated Averaging (FedAvg) pipeline running over localhost ports 5001–5003. Orphaned diabetes/text-classification code (`train_text_model.py`, `generate_text_data.py`) is deprecated and can be deleted.
+**Data privacy guarantee:** Zero images or pixel data leave the local server. Only anonymised numeric text is sent to the external Groq API.
 
 ---
 
-## 2. Section A — Completed Refactoring Details
+## 2. Phase 1 — Codebase Stabilisation
 
-### 2.1 Path Portability
+### 2.1 Changes Made
 | File | Change |
 |---|---|
-| `simple_backend.py` | All paths replaced with `Path(__file__).resolve().parent / ...` |
-| `train_model.py` | Dataset and model paths now CLI args with `argparse`; default auto-detects relative `data set/chest_xray` |
-| `test_model.py` | Model and image paths now CLI args; no hardcoded paths remain |
-| `data_splitter.py` | Source and output paths are all relative to project root |
+| `simple_backend.py` | Portable paths, 0–100 severity scale everywhere, MIME validation, startup model guard, `weights_only=True` |
+| `train_model.py` | Argparse CLI, portable paths, `weights_only=True` |
+| `test_model.py` | Argparse CLI, portable paths, `weights_only=True` |
+| `test_backend.py` | Fully rewritten — 6 tests, correct endpoints and field names |
+| `requirements.txt` | All ML deps uncommented, diabetes deps removed |
 
-### 2.2 Severity Score Standardisation
-- `predict_pneumonia()` now converts to `0–100` **immediately** before returning:  
-  `severity_score_100 = round(raw_severity * 100, 2)`  
-  `confidence_100 = round(confidence * 100, 2)`
-- `update_analyzed()` receives and stores `0–100` values; the DB column now holds the same scale.
-- All three triage endpoints (`analyze-one`, `upload-bulk`, `queue`) read from and write to this uniform scale.
-- Priority thresholds: `severity >= 70` → High, `>= 40` → Medium, `< 40` → Low — evaluated correctly everywhere via `_priority_label()`.
+### 2.2 Severity Scale
+All metrics are stored and returned on a uniform **0–100 float scale** throughout:
+- `predict_pneumonia()` converts raw 0–1 probabilities immediately
+- `update_analyzed()` stores 0–100 values in SQLite
+- All three triage endpoints read, write, and return 0–100
+- Priority thresholds: `>= 70` → High, `>= 40` → Medium, `< 40` → Low
 
-### 2.3 MIME / Extension Validation
-- New helper `_validate_image_file(file)` checks extension ∈ `{png, jpg, jpeg}` and MIME type ∈ `{image/png, image/jpeg}`.
-- Applied to: `/api/analyze/image`, `/api/triage/analyze-one`, `/api/triage/upload-bulk`.
-- Invalid files return `400 Bad Request` JSON `{"error": "..."}` — no raw stack traces exposed.
-
-### 2.4 PyTorch Safe Loading
-- All `torch.load(...)` calls now include `weights_only=True`:
-  ```python
-  torch.load(str(MODEL_PATH), map_location=device, weights_only=True)
-  ```
-  Applied in `simple_backend.py`, `test_model.py`, `federated_client.py`, and `federated_server.py`.
-
-### 2.5 Graceful Model Startup Guard
-In `simple_backend.py`, `load_pneumonia_model()` checks `PNEUMONIA_MODEL_PATH.exists()`.  
-If missing: prints a loud bordered warning, initialises with random weights, continues running.  
-Server never crashes on startup due to a missing model file.  
-The `/api/health` endpoint exposes `"model_checkpoint": true/false` so you can verify remotely.
-
-### 2.6 test_backend.py Rewrite
-- Removed: all references to `/api/analyze/file` and text/diabetes uploads.
-- Fixed: image test now uses field `'file'` and endpoint `/api/analyze/image`.
-- Added: 6 targeted tests — health check, single image (with 0–100 scale validation), triage analyze-one, triage queue (with sort order assertion), MIME validation rejection, and triage clear.
-- Added: `--url` CLI flag for flexible target overriding.
-- Health check gates all other tests; exits with code 1 on any failure.
-
-### 2.7 Deprecated Files
-The following files are orphaned and should be deleted at your convenience.  
-They are not referenced by any active code:
+### 2.3 Deprecated Files
+Safe to delete — not referenced by any active code:
 - `train_text_model.py`
 - `generate_text_data.py`
 
-### 2.8 requirements.txt
-- All ML packages uncommented and pinned: `flask`, `flask-cors`, `werkzeug`, `requests`, `python-dotenv`, `pillow`, `torch`, `torchvision`, `numpy`.
-- Removed: `scikit-learn`, `joblib`, `PyPDF2`, `python-docx`, `fastapi`, `uvicorn`.
+---
+
+## 3. Phase 1.5 — Robustness Techniques
+
+New file: **`xray_transforms.py`** — single source of truth for all image transforms.
+
+| Technique | Implementation | Where Used |
+|---|---|---|
+| CLAHE preprocessing | `apply_clahe()` — grayscale → CLAHE → RGB | Training dataset, all inference |
+| Albumentations pipeline | `TRAIN_TRANSFORM`, `VAL_TRANSFORM` | `train_model.py` |
+| Label smoothing | `CrossEntropyLoss(label_smoothing=0.1)` | `train_model.py` |
+| Cosine annealing WR | `CosineAnnealingWarmRestarts(T_0=10, T_mult=2)` | `train_model.py` |
+| Mixup (α=0.4) | `mixup_data()` + `mixup_criterion()` | `train_model.py` |
+| TTA inference | `run_tta_inference()` — 4 or 8 augmented passes | `simple_backend.py` (all endpoints) |
+
+**TTA level:** Controlled via `TTA_LEVEL` env var (`fast`=4 passes, `full`=8). Default: `fast`.
+
+### 3.1 Augmentation Detail (TRAIN_TRANSFORM)
+- ElasticTransform (α=120, σ=6) — simulates breathing artefacts
+- GridDistortion — scanner geometric distortion
+- RandomBrightnessContrast (±30%) — scanner calibration variance
+- GaussNoise (σ=0.02–0.12) — electronic noise at low dose
+- CLAHE (p=0.4) — randomly applied so model handles raw and processed inputs
+- CoarseDropout (1–6 holes, 8–24px) — foreign objects, occlusions
+- HorizontalFlip, RandomRotate90
 
 ---
 
-## 3. Section B — Federated Learning Infrastructure
+## 4. Phase 2 — Live UI & Privacy Pipeline
 
-### 3.1 Architecture Overview
+### 4.1 Privacy-Preserving Groq Pipeline
+
+**`/api/analyze/image` data flow (Task 3):**
 
 ```
-  ┌─────────────────────────────────────────────────────┐
-  │              federated_server.py                    │
-  │  (Orchestrator — no raw data access)                │
-  │  - Initialises global EfficientNet-B0               │
-  │  - Dispatches global weights → 3 nodes              │
-  │  - Collects updated weights from each node          │
-  │  - Applies FedAvg: θ_global ← (1/N)Σθ_client_i     │
-  │  - Saves checkpoint → models/pneumonia_model.pth    │
-  └────────────┬───────────────┬───────────────┬────────┘
-               │               │               │
-               ▼               ▼               ▼
-  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐
-  │ federated_     │  │ federated_     │  │ federated_     │
-  │ client.py      │  │ client.py      │  │ client.py      │
-  │ port=5001      │  │ port=5002      │  │ port=5003      │
-  │ data/hospital_A│  │ data/hospital_B│  │ data/hospital_C│
-  └────────────────┘  └────────────────┘  └────────────────┘
+[Raw image bytes] ──► local EfficientNet-B0 TTA ──► numeric metrics
+                                                         │
+                                                         ▼
+                                          anonymised text string
+                                     "LOCAL_ANALYSIS: Class=..., Confidence=...%,
+                                      Triage_Severity=.../100, P(Normal)=...%,
+                                      P(Pneumonia)=...%, Method=EfficientNet-B0_TTA_4pass"
+                                                         │
+                                                         ▼
+                                              Groq API (text only)
+                                              Llama-3.1-8b-instant
+                                                         │
+                                                         ▼
+                                          clinical reasoning text
+                                                         │
+                                    ┌────────────────────┘
+                                    ▼
+                         combined JSON response to frontend
+                         {prediction, confidence, severity_score,
+                          normal_prob, pneumonia_prob, tta_passes,
+                          privacy: {image_sent_externally: false,
+                                    anonymised_summary: "...",
+                                    external_service: "Groq/..."},
+                          reasoning: "..."}
 ```
 
-### 3.2 data_splitter.py
-| Property | Detail |
-|---|---|
-| Input | `data set/chest_xray/train/` (Kaggle dataset) |
-| Output | `data/hospital_A/`, `data/hospital_B/`, `data/hospital_C/` |
-| Strategy | Even round-robin split per class after random shuffle (seed=42) |
-| Class preservation | NORMAL and PNEUMONIA subdirs replicated inside each hospital dir |
-| Idempotent | Safe to re-run; existing files are overwritten by `shutil.copy2` |
-| CLI arg | `--dataset /custom/path --seed 42` |
+**Privacy guarantees:**
+- `image_sent_externally: false` — always; raw bytes never leave the Flask process
+- Groq prompt explicitly instructs Llama not to infer an image exists
+- Groq prompt explicitly instructs Llama not to hallucinate patient details
+- The `anonymised_summary` string is surfaced in the frontend as a transparency badge
 
-### 3.3 federated_client.py
-| Property | Detail |
-|---|---|
-| Launch | `python federated_client.py <PORT> <DATA_DIR>` |
-| Data isolation | Strictly reads only `DATA_DIR`; no cross-node data access possible |
-| Model | Fresh EfficientNet-B0 (no weights), classifier head replaced for 2-class output |
-| Training | 1 local epoch, Adam optimizer, lr=0.0005, CrossEntropyLoss |
-| Input | `POST /train_round` — multipart field `weights` (binary state_dict) |
-| Output | `200 OK`, `application/octet-stream` — updated binary state_dict |
-| Error handling | Returns `400` for missing/empty payload; `500` with JSON error for runtime failures |
-| Bonus endpoint | `GET /health` — returns port, data_dir, num_images, device |
+### 4.2 SSE Architecture (Task 1)
 
-### 3.4 federated_server.py
-| Property | Detail |
-|---|---|
-| Registered nodes | `http://127.0.0.1:5001`, `5002`, `5003` |
-| Global model | EfficientNet-B0, IMAGENET1K_V1 ImageNet pre-weights |
-| Pre-round probe | `GET /health` on each node; unreachable nodes are skipped (not fatal) |
-| Communication | Sequential HTTP POST to each alive node; configurable `--timeout` (default 300s) |
-| Aggregation | FedAvg: per-layer tensor stack + `mean(dim=0)` across all responding clients |
-| Checkpoint | Saved after every round with keys: `round`, `model_state_dict`, `num_clients`, `classes` |
-| CLI args | `--rounds N`, `--output path`, `--timeout seconds` |
+**Endpoint:** `GET /api/federated/stream` → `text/event-stream`
+
+**Internal mechanism:**
+- `_sse_queue: queue.Queue` — thread-safe FIFO, max 512 events
+- `_push_event(type, payload)` — non-blocking push from FL thread
+- SSE generator drains queue with 25s timeout; emits `: keepalive` on empty
+
+**Event types emitted:**
+
+| Event type | Payload fields | Trigger |
+|---|---|---|
+| `connected` | `message` | On EventSource open |
+| `round_start` | `round`, `total` | Each round begins |
+| `node_status` | `node`, `id`, `status` | Node goes training/idle/error/offline |
+| `log_stream` | `log` | Every major orchestrator action |
+| `round_complete` | `round`, `global_accuracy`, `num_clients` | After FedAvg applied |
+| `fl_done` | `rounds` | All rounds finished |
+| `fl_error` | `message` | No nodes reachable |
+
+**Threading:** `app.run(threaded=True)` — essential. The SSE generator blocks in its thread while the FL orchestrator runs in a `daemon=True` background thread. Both coexist safely via the queue.
+
+### 4.3 Federated Control Tower UI (Task 2)
+
+**New tab:** "🛰 Fed. Tower" — `panel-fl` section in `report-analyzer.html`
+
+**Components:**
+
+**Node monitors (3 cards, one per hospital):**
+- Status badge: Idle / 🟢 Training / Offline / ⚠ Error
+- Circular SVG ring with CSS `stroke-dasharray`/`stroke-dashoffset` animation
+- `ringPulse` keyframe: animates ring fill 220→55→220 dashoffset while training
+- Card glows cyan (`box-shadow: 0 0 24px rgba(0,212,255,.12)`) during training
+- Top border sweep animation (gradient bar) activates on training state
+
+**HUD Terminal console:**
+- Dark `#080810` background, JetBrains Mono, cyan text
+- macOS-style dot header (`terminal-header`)
+- Scrolling `terminal-body` div, auto-scrolls to bottom on each log line
+- Blinking cursor appended to last line
+- Colour coding: green (normal), red (error/fail), dim (metadata)
+- Pruned to 200 lines max
+
+**Live accuracy chart (Chart.js 4.4.1 via CDN):**
+- Line chart, `fill: true`, cyan gradient
+- X axis: `R1`, `R2`, … (round labels)
+- Y axis: 50–100% accuracy range
+- Dark theme: `#10101a` tooltip background, cyan border
+- `pushChartPoint(round, accuracy)` called on each `round_complete` event
+- "↺ Reset" button clears chart data
+
+**Control panel:**
+- "⚡ Trigger Training Round" — cyan glow button, disabled during active round
+- Rounds input (1–10, clamped server-side)
+- SSE connection dot indicator (grey → green pulsing → red on error)
+
+**JS EventSource client:**
+- `connectSSE()` — creates `EventSource`, wires `onmessage`, `onopen`, `onerror`
+- `_sseSource` module-level singleton, reconnectable
+- `initFLPanel()` — called once on first tab open; inits chart + SSE + node probe
+- Node probe: `GET /api/federated/nodes` on tab open to set initial online/offline state
+
+### 4.4 New Endpoints Added
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/federated/stream` | SSE event stream |
+| `POST` | `/api/federated/trigger` | Start FL round(s) in background thread |
+| `GET` | `/api/federated/nodes` | Live health status of all 3 nodes |
 
 ---
 
-## 4. Current Execution State
+## 5. Current Execution State
 
 ### File Checklist
 | File | Status |
 |---|---|
-| `simple_backend.py` | ✅ Refactored & complete |
-| `train_model.py` | ✅ Paths portable, `weights_only` updated |
-| `test_model.py` | ✅ Paths portable, `weights_only` updated, CLI args |
-| `test_backend.py` | ✅ Fully rewritten |
-| `requirements.txt` | ✅ Clean, all ML deps uncommented |
-| `init_db.py` | ✅ Unchanged (already correct) |
-| `data_splitter.py` | ✅ New — built Phase 1 |
-| `federated_client.py` | ✅ New — built Phase 1 |
-| `federated_server.py` | ✅ New — built Phase 1 |
+| `simple_backend.py` | ✅ Phase 2 complete — SSE, privacy pipeline, FL trigger |
+| `report-analyzer.html` | ✅ Phase 2 complete — 3 panels, Control Tower, SSE client |
+| `xray_transforms.py` | ✅ Phase 1.5 complete — CLAHE, Albumentations, TTA |
+| `train_model.py` | ✅ Phase 1.5 complete — all robustness techniques |
+| `test_model.py` | ✅ Phase 1 complete — portable CLI |
+| `test_backend.py` | ✅ Phase 1 complete — 6 tests |
+| `requirements.txt` | ✅ Clean — all deps uncommented |
+| `data_splitter.py` | ✅ Phase 1 complete |
+| `federated_client.py` | ✅ Phase 1 complete |
+| `federated_server.py` | ✅ Phase 1 complete (standalone CLI) |
+| `SESSION_STATE.md` | ✅ Phase 2 updated |
 | `train_text_model.py` | ⚠️ Deprecated — safe to delete |
 | `generate_text_data.py` | ⚠️ Deprecated — safe to delete |
 
-### How to Run the Full System (4 Terminals)
+### How to Run (4+ Terminals)
 
-**Terminal 1 — Main API backend:**
+**Terminal 1 — Main backend:**
 ```bash
 python simple_backend.py
-# Runs on http://localhost:5000
+# http://localhost:5000
 ```
 
-**Terminals 2–4 — Federated hospital nodes (after running data_splitter.py):**
+**Terminals 2–4 — FL hospital nodes (optional, only needed for FL tab):**
 ```bash
-# First, split the data:
-python data_splitter.py
-
-# Then start each node in a separate terminal:
+python data_splitter.py                          # run once
 python federated_client.py 5001 data/hospital_A
 python federated_client.py 5002 data/hospital_B
 python federated_client.py 5003 data/hospital_C
 ```
 
-**Federated training round (separate terminal):**
-```bash
-python federated_server.py --rounds 5
-# Aggregated model saved to models/pneumonia_model.pth
+**Open the frontend:**
+```
+Open report-analyzer.html in a browser
 ```
 
-**Run tests:**
+**Run tests (backend must be running):**
 ```bash
-# Backend must be running first
 python test_backend.py
-
-# Single model test (checkpoint must exist):
-python test_model.py --image /path/to/xray.jpg
 ```
-
-### Known Issues Resolved
-- ✅ `torch.load` deprecation warnings (fixed with `weights_only=True`)
-- ✅ Severity score inconsistency between `analyze-one` (0–100) and `queue` (0–1) — now uniform 0–100 everywhere
-- ✅ `test_backend.py` testing non-existent `/api/analyze/file` endpoint — rewritten
-- ✅ Windows absolute paths crashing on non-Windows machines — eliminated
-- ✅ Server crash on missing model file — replaced with graceful warning + random weights
 
 ---
 
-## 5. Phase 2 Hand-off Protocol
+## 6. Phase 3 Hand-off Protocol
 
-### What is Complete and Ready
-- The main Flask backend (`simple_backend.py`) exposes all endpoints the frontend needs; the `/api/triage/analyze-one` endpoint is already designed for per-file progressive updates (one HTTP call per image).
-- All severity/confidence values returned are on a consistent 0–100 scale, ready for display in progress bars.
-- The Federated Learning pipeline is fully wired end-to-end on localhost; all 3 FL scripts are production-ready.
-- The Groq integration function `get_ai_reasoning()` exists and works; it is currently called only in `/api/analyze/image`.
+### Ready to integrate
+- SSE infrastructure is live and proven; adding new event types requires only `_push_event()` calls
+- The `privacy` field in `/api/analyze/image` response is structured for easy extension
+- Chart.js is already loaded and `pushChartPoint()` is exposed globally
+- All node state management is centralised in `setNodeStatus(nodeId, status)`
 
-### Phase 2 Targets
-1. **Frontend SSE Integration:** Add a `GET /api/triage/stream` Server-Sent Events endpoint in `simple_backend.py` that emits per-image progress events during bulk uploads. Update `report-analyzer.html` to consume the event stream and render a real-time progress bar.
-
-2. **Real-Time Progress Bars:** The frontend's `submitBulk()` currently fires N parallel `fetch` calls to `analyze-one`. Migrate this to the SSE stream endpoint so progress is server-driven and doesn't depend on client-side Promise.all timing.
-
-3. **Privacy-Preserving Groq Pipeline:** Extend the Groq reasoning call to accept an optional `noise_sigma` parameter and add differential-privacy noise to the confidence value before sending it to the external Groq API. This ensures the raw model confidence is never transmitted in plain form to a third-party service.
-
-4. **Federated Training Trigger Endpoint:** Add a `POST /api/federated/start-round` endpoint to `simple_backend.py` that programmatically launches a federated round (calling `federated_server.py` logic) and streams round-by-round progress back to the frontend via SSE.
+### Phase 3 candidates
+1. **Real accuracy evaluation** — wire a held-out validation set into `_run_fl_round_thread` and replace mock accuracy with real per-round test metrics
+2. **Differential privacy noise** — add Gaussian noise to confidence before Groq call: `conf_noised = conf + N(0, σ²)` with configurable σ
+3. **Multi-disease support** — extend the model head to N classes; update `_build_anonymised_summary` and frontend badge rendering
+4. **Auth layer** — add JWT token validation to `/api/federated/trigger` to prevent unauthorised FL round initiation
+5. **Docker Compose** — containerise all 5 processes (backend + 3 nodes + nginx) for one-command deployment

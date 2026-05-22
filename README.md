@@ -1,14 +1,16 @@
 # Medical Report Analyzer
 
-An AI-powered medical report analysis tool that detects **Diabetes** from clinical documents and **Pneumonia** from chest X-rays — with structured AI reasoning explaining every decision.
+An AI-powered chest X-ray analysis tool that detects **Pneumonia** using a privacy-preserving local inference pipeline — with structured AI reasoning explaining every decision.
 
 ---
 
 ## What It Does
 
-- Upload a medical report (PDF, DOCX, TXT) → detects diabetes using TF-IDF + Logistic Regression
-- Upload a chest X-ray (JPG, PNG) → detects pneumonia using EfficientNet-B0
-- After every analysis, Groq AI (Llama 3) generates a structured explanation with Summary, Key Evidence, Model Reasoning, and a Clinical Note
+- Upload a chest X-ray (JPG, PNG) → detects pneumonia using EfficientNet-B0 with TTA
+- Local vision model runs entirely on-premises — **zero images leave the server**
+- Only anonymised numeric metrics are sent to Groq AI (Llama 3.1) for clinical reasoning
+- Smart Triage Dashboard for batch X-ray processing with priority queuing
+- Federated Control Tower for coordinating distributed hospital node training
 
 ---
 
@@ -16,38 +18,69 @@ An AI-powered medical report analysis tool that detects **Diabetes** from clinic
 
 ```
 report-analyzer/
-├── report-analyzer.html      # Frontend (dark theme, purple accent)
-├── simple_backend.py         # Flask backend — main server
-├── test_backend.py           # API test script
+├── report-analyzer.html      # Frontend — 3-panel SPA (Analysis, Triage, Fed. Tower)
+├── simple_backend.py         # Flask backend — main server + SSE + FL orchestrator
+├── xray_transforms.py        # CLAHE preprocessing, Albumentations, TTA inference
+├── federated_client.py       # Simulated hospital FL node
+├── federated_server.py       # Standalone FL server CLI
+├── data_splitter.py          # Splits dataset across hospital nodes
+├── train_model.py            # EfficientNet-B0 training script
+├── test_backend.py           # API test script (6 tests)
 ├── test_model.py             # Standalone image model test
+├── init_db.py                # Database initialisation
 ├── requirements.txt          # Python dependencies
 ├── .env                      # API keys — DO NOT commit
 ├── .env.example              # Template for .env
 ├── .gitignore
 ├── models/                   # Trained models — not in Git
-│   ├── pneumonia_model.pth   # EfficientNet-B0 (87.34% accuracy)
-│   ├── text_model.pkl        # Logistic Regression classifier
-│   └── vectorizer.pkl        # TF-IDF vectorizer
-└── data/
-    └── text_reports.json     # Synthetic diabetes training data
+│   └── pneumonia_model.pth   # EfficientNet-B0 (87.34% accuracy)
+├── data/
+│   ├── hospital_A/           # Federated node data split
+│   ├── hospital_B/
+│   └── hospital_C/
+└── uploads/                  # Temporary upload storage
 ```
 
 ---
 
-## Models
+## Model
 
 | Model | Task | Architecture | Accuracy |
 |-------|------|-------------|----------|
 | Pneumonia Detection | Chest X-ray classification | EfficientNet-B0 | 87.34% |
-| Diabetes Detection | Medical text classification | TF-IDF + Logistic Regression | 100%* |
 
-*Trained on synthetic data — accuracy reflects training data quality.
-
-**Training data:**
-- Chest X-rays: [Kaggle Chest X-Ray Dataset](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia) — 5,216 images
-- Diabetes reports: 1,000 synthetic clinical reports generated via `generate_text_data.py`
+**Training data:** [Kaggle Chest X-Ray Dataset](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia) — 5,216 images
 
 **Hardware used:** NVIDIA RTX 3050 6GB (CUDA 11.8, PyTorch 2.7)
+
+**Robustness techniques applied during training:**
+- CLAHE preprocessing
+- Albumentations augmentation (ElasticTransform, GridDistortion, GaussNoise, CoarseDropout)
+- Label smoothing (0.1)
+- Cosine annealing warm restarts
+- Mixup (α=0.4)
+- Test-Time Augmentation (TTA) — 4-pass fast inference
+
+---
+
+## Privacy-Preserving Pipeline
+
+```
+[Raw image bytes] → local EfficientNet-B0 TTA → numeric metrics
+                                                      │
+                                                      ▼
+                                         anonymised text summary
+                                    (no pixel data, no patient info)
+                                                      │
+                                                      ▼
+                                         Groq API (text only)
+                                         Llama-3.1-8b-instant
+                                                      │
+                                                      ▼
+                                         clinical reasoning text
+```
+
+**Guarantee:** `image_sent_externally: false` — raw bytes never leave the Flask process.
 
 ---
 
@@ -63,7 +96,7 @@ cd report-analyzer
 ### 2. Install dependencies
 
 ```bash
-pip install flask flask-cors pillow PyPDF2 python-docx torch torchvision joblib numpy requests python-dotenv
+pip install -r requirements.txt
 ```
 
 ### 3. Set up environment variables
@@ -79,16 +112,14 @@ GROQ_API_KEY=your_groq_key_here
 
 Get a free key at [console.groq.com](https://console.groq.com) — no credit card needed.
 
-### 4. Add trained models
+### 4. Add trained model
 
-Place your trained model files in the `models/` folder:
+Place your trained model file in the `models/` folder:
 ```
 models/pneumonia_model.pth
-models/text_model.pkl
-models/vectorizer.pkl
 ```
 
-> Models are excluded from Git due to file size. Train them using `train_model.py` and `train_text_model.py`.
+> Model is excluded from Git due to file size. Train it using `train_model.py`.
 
 ### 5. Run the backend
 
@@ -104,9 +135,7 @@ Open `report-analyzer.html` in your browser — no web server needed.
 
 ---
 
-## Training the Models
-
-### Pneumonia model (EfficientNet-B0)
+## Training the Model
 
 1. Download the [Chest X-Ray dataset](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia) from Kaggle
 2. Extract to `data set/chest_xray/`
@@ -115,16 +144,26 @@ Open `report-analyzer.html` in your browser — no web server needed.
 python train_model.py
 ```
 
-### Diabetes text model (TF-IDF + Logistic Regression)
+---
 
-1. Generate synthetic training data:
+## Federated Learning (Optional)
+
+Run 3 simulated hospital nodes alongside the main backend:
+
 ```bash
-python generate_text_data.py
+# Terminal 1 — Main backend
+python simple_backend.py
+
+# Run once to split data
+python data_splitter.py
+
+# Terminals 2–4 — Hospital nodes
+python federated_client.py 5001 data/hospital_A
+python federated_client.py 5002 data/hospital_B
+python federated_client.py 5003 data/hospital_C
 ```
-2. Train the classifier:
-```bash
-python train_text_model.py
-```
+
+Then use the **Federated Control Tower** tab in the frontend to trigger training rounds and monitor nodes in real time via SSE.
 
 ---
 
@@ -132,20 +171,33 @@ python train_text_model.py
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/analyze/file` | Analyze a document report for diabetes |
 | POST | `/api/analyze/image` | Analyze a chest X-ray for pneumonia |
-| GET | `/api/health` | Check if the server is running |
+| POST | `/api/triage/analyze-one` | Analyze a single X-ray for the triage queue |
+| POST | `/api/triage/upload-bulk` | Batch analyze up to 20 X-rays |
+| GET | `/api/triage/queue` | Retrieve the triage queue |
+| DELETE | `/api/triage/clear` | Clear the triage queue |
+| GET | `/api/federated/stream` | SSE stream for FL round events |
+| POST | `/api/federated/trigger` | Start a federated training round |
+| GET | `/api/federated/nodes` | Live health status of all FL nodes |
+| GET | `/api/health` | Check server status |
 
-**Request:** `multipart/form-data` with field name `report`
-
-**Response:**
+**Response example (`/api/analyze/image`):**
 ```json
 {
+  "disease": "Pneumonia",
+  "prediction": "PNEUMONIA",
+  "confidence": 94.2,
   "detected": true,
-  "confidence": 99.4,
-  "diseaseName": "Pneumonia",
-  "reportType": "image",
-  "reasoning": "**Summary**\n..."
+  "severity_score": 82.1,
+  "normal_prob": 5.8,
+  "pneumonia_prob": 94.2,
+  "tta_passes": 4,
+  "privacy": {
+    "image_sent_externally": false,
+    "anonymised_summary": "LOCAL_ANALYSIS: Class=PNEUMONIA, ...",
+    "external_service": "Groq / Llama-3.1-8b-instant"
+  },
+  "reasoning": "• Triage urgency: ..."
 }
 ```
 
@@ -155,26 +207,14 @@ python train_text_model.py
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | HTML, CSS, JavaScript |
-| Backend | Python, Flask |
-| Image Model | PyTorch, EfficientNet-B0 |
-| Text Model | Scikit-learn, TF-IDF, Logistic Regression |
+| Frontend | HTML, CSS, JavaScript (Vanilla), Chart.js |
+| Backend | Python, Flask, Flask-CORS |
+| Image Model | PyTorch, EfficientNet-B0, TTA |
+| Augmentation | Albumentations, CLAHE |
 | AI Reasoning | Groq API (Llama 3.1 — free tier) |
+| Database | SQLite (triage queue persistence) |
+| Federated Learning | FedAvg, SSE streaming |
 | GPU | NVIDIA RTX 3050, CUDA 11.8 |
-
----
-
-## Test Reports
-
-Five sample diabetes reports are included for testing and showcase:
-
-| File | Type | Expected Result |
-|------|------|----------------|
-| `01_Diabetes_Severe_Positive.docx` | HbA1c 9.8%, glucose 247 mg/dL | Detected |
-| `02_Diabetes_Mild_Prediabetes.docx` | HbA1c 6.3%, glucose 118 mg/dL | Detected |
-| `03_Diabetes_Negative_Normal.docx` | HbA1c 5.1%, glucose 88 mg/dL | Not detected |
-| `04_Diabetes_Borderline_IGT.docx` | OGTT — impaired glucose tolerance | Detected |
-| `05_Diabetes_Followup_Treatment.docx` | Known diabetic on Metformin | Detected |
 
 ---
 
@@ -186,4 +226,4 @@ This tool is for **educational purposes only**. It does not constitute medical a
 
 ## Academic Project
 
-Built as a student project demonstrating the integration of machine learning models with a web interface for medical report analysis.
+Built as a student project demonstrating privacy-preserving medical AI, federated learning, and real-time web interfaces.
