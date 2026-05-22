@@ -13,6 +13,7 @@ All severity/confidence values remain on a uniform 0–100 float scale.
 TTA (4-pass fast) is applied on every inference call.
 """
 
+import base64
 import io
 import json
 import os
@@ -22,6 +23,8 @@ import threading
 import traceback
 from pathlib import Path
 
+import cv2
+import numpy as np
 import requests
 import torch
 import torch.nn as nn
@@ -30,7 +33,7 @@ from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 from torchvision import models
 
-from xray_transforms import run_tta_inference
+from xray_transforms import run_tta_inference, apply_clahe
 
 # ── Project paths ─────────────────────────────────────────────────────────────
 ROOT_DIR             = Path(__file__).resolve().parent
@@ -236,6 +239,76 @@ def predict_pneumonia(image_bytes: bytes) -> dict:
     """TTA inference — all metrics on 0–100 scale."""
     model = load_pneumonia_model()
     return run_tta_inference(model, image_bytes, device, tta_level=TTA_LEVEL)
+
+
+def generate_gradcam(image_bytes: bytes) -> str:
+    """
+    Generate a Grad-CAM heatmap overlay for the given image.
+    Targets the last conv block of EfficientNet-B0.
+    Returns a base64-encoded JPEG string.
+    """
+    import albumentations as A
+    from albumentations.pytorch import ToTensorV2
+
+    model = load_pneumonia_model()
+
+    activations = []
+    gradients   = []
+
+    def forward_hook(module, input, output):
+        activations.append(output.detach())
+
+    def backward_hook(module, grad_input, grad_output):
+        gradients.append(grad_output[0].detach())
+
+    target_layer = model.features[-1]
+    fh = target_layer.register_forward_hook(forward_hook)
+    bh = target_layer.register_full_backward_hook(backward_hook)
+
+    try:
+        rgb_array = apply_clahe(image_bytes)
+        tfm = A.Compose([
+            A.Resize(224, 224),
+            A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=1.0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(),
+        ])
+        tensor = tfm(image=rgb_array)["image"].unsqueeze(0).to(device)  # (1,3,224,224)
+
+        # Need grad on input to allow backward through BatchNorm in eval mode
+        tensor = tensor.requires_grad_(True)
+
+        # Set only the feature extractor to train mode so BatchNorm1d
+        # in the classifier (batch_size=1) doesn't crash.
+        # features needs train mode for gradient flow through BatchNorm2d.
+        model.features.train()
+        model.classifier.eval()
+        logits = model(tensor)                          # (1, 2)
+        pred_class = logits.argmax(dim=1).item()
+        score = logits[0, pred_class]
+        model.zero_grad()
+        score.backward()
+        model.eval()
+
+        grads = gradients[0]       # (1, C, H, W)
+        acts  = activations[0]     # (1, C, H, W)
+
+        weights = grads.mean(dim=(2, 3), keepdim=True)   # (1, C, 1, 1)
+        cam = (weights * acts).sum(dim=1).squeeze(0)     # (H, W)
+        cam = torch.relu(cam).cpu().numpy()
+        cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-8)
+        cam = np.uint8(255 * cam)
+        cam = cv2.resize(cam, (224, 224))
+
+        heatmap      = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
+        orig_resized = cv2.resize(cv2.cvtColor(rgb_array, cv2.COLOR_RGB2BGR), (224, 224))
+        overlay      = cv2.addWeighted(orig_resized, 0.5, heatmap, 0.5, 0)
+
+        _, buf = cv2.imencode(".jpg", overlay, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        return "data:image/jpeg;base64," + base64.b64encode(buf).decode()
+    finally:
+        fh.remove()
+        bh.remove()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -603,6 +676,18 @@ def analyze_image():
         # Step 1 & 2: Local TTA inference — image never leaves this process
         pred = predict_pneumonia(image_bytes)
 
+        # Grad-CAM heatmap (generated locally, never sent externally)
+        gradcam_b64 = None
+        gradcam_error = None
+        try:
+            gradcam_b64 = generate_gradcam(image_bytes)
+        except Exception as gc_exc:
+            gradcam_error = str(gc_exc)
+            traceback.print_exc()
+
+        # Original image as base64 for side-by-side display
+        orig_b64 = "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode()
+
         # Step 3: Anonymised text compilation — only numbers, no pixel data
         anon_summary = _build_anonymised_summary(
             prediction=    pred["prediction"],
@@ -627,6 +712,10 @@ def analyze_image():
             "normal_prob":        pred["normal_prob"],        # 0–100
             "pneumonia_prob":     pred["pneumonia_prob"],     # 0–100
             "tta_passes":         pred["tta_passes"],
+            # Images (local only — never sent to Groq)
+            "original_image":     orig_b64,
+            "gradcam_heatmap":    gradcam_b64,
+            "gradcam_error":      gradcam_error,
             # Privacy metadata — for frontend transparency badge
             "privacy": {
                 "image_sent_externally":    False,
