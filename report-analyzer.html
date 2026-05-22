@@ -403,6 +403,7 @@ tbody td { padding: 11px 16px; vertical-align: middle; }
 ::-webkit-scrollbar-thumb { background: rgba(155,89,245,.3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--purple); }
 
+
 @media (max-width: 600px) { .triage-grid { grid-template-columns: 1fr 1fr !important; } }
 </style>
 </head>
@@ -587,6 +588,7 @@ tbody td { padding: 11px 16px; vertical-align: middle; }
 
 <div class="toast" id="toast"></div>
 
+
 <script>
 /* ═══════════════════════════════════════════════════════════════
    CONFIG
@@ -603,6 +605,7 @@ function openImgPicker(e) {
 }
 function openBulkPicker(e) {
   if (e.target.closest('button')) return;
+  if (isProcessing) return;  // don't open file picker while processing
   document.getElementById('file-bulk').click();
 }
 
@@ -624,7 +627,7 @@ function switchMode(mode) {
     const btn = document.getElementById('bulk-submit-btn');
     if (btn) { btn.disabled = false; btn.textContent = 'Run Triage'; }
   }
-  if (mode === 'triage') refreshQueue();
+  if (mode === 'triage' && !isProcessing) refreshQueue();
   if (mode === 'fl')     initFLPanel();
 }
 
@@ -653,6 +656,7 @@ function onDropImg(e) {
 }
 function onDropBulk(e) {
   e.preventDefault(); offDrag(document.getElementById('zone-bulk'));
+  if (isProcessing) return;  // ignore drops while processing
   const inp = document.getElementById('file-bulk');
   const dt  = new DataTransfer();
   Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
@@ -733,6 +737,7 @@ let selectedFiles = [], liveQueue = [], isProcessing = false;
 document.getElementById('bulk-submit-btn').disabled = true;
 
 function handleBulkSelect() {
+  if (isProcessing) return;  // ignore change events while processing
   const inp = document.getElementById('file-bulk');
   const all = Array.from(inp.files);
   if (all.length > 20) {
@@ -768,15 +773,24 @@ function renderUploadList(items) {
 async function submitBulk() {
   if (!selectedFiles.length || isProcessing) return;
   isProcessing = true;
-  const btn = document.getElementById('bulk-submit-btn');
-  btn.disabled = true; btn.textContent = `0 / ${selectedFiles.length} done`;
+
+  const filesToProcess = selectedFiles.slice();
+  const btn  = document.getElementById('bulk-submit-btn');
+  const zone = document.getElementById('zone-bulk');
+  btn.disabled = true;
+  btn.textContent = `0 / ${filesToProcess.length} done`;
+  zone.style.pointerEvents = 'none';
+  zone.style.opacity = '0.45';
+
   liveQueue = []; renderQueue(liveQueue);
   let doneCount = 0, errCount = 0;
 
+  renderUploadList(filesToProcess.map(f => ({ name: f.name, state: 'queued' })));
+
   try {
-    for (let i = 0; i < selectedFiles.length; i++) {
+    for (let i = 0; i < filesToProcess.length; i++) {
       setItemState(i, 'processing');
-      const fd = new FormData(); fd.append('file', selectedFiles[i]);
+      const fd = new FormData(); fd.append('file', filesToProcess[i]);
       try {
         const res  = await fetch(API + '/api/triage/analyze-one', { method: 'POST', body: fd });
         const data = await res.json();
@@ -788,11 +802,15 @@ async function submitBulk() {
         setItemState(i, 'error', err.message.slice(0, 30)); errCount++;
       }
       renderQueue(liveQueue); updateStats(liveQueue);
-      btn.textContent = `${doneCount + errCount} / ${selectedFiles.length} done`;
+      btn.textContent = `${doneCount + errCount} / ${filesToProcess.length} done`;
     }
     toast(`✓ ${doneCount} analyzed${errCount ? ', ' + errCount + ' errors' : ''}`, errCount ? 'error' : 'success');
   } finally {
-    isProcessing = false; btn.disabled = false; btn.textContent = 'Run Triage';
+    isProcessing = false;
+    btn.disabled = false;
+    btn.textContent = 'Run Triage';
+    zone.style.pointerEvents = '';
+    zone.style.opacity = '';
   }
 }
 
